@@ -17,10 +17,12 @@
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* NÃO colocar overflow-x aqui: no iOS isso transforma o body em contêiner de
+   rolagem e o cabeçalho sticky para de grudar no topo. O corte horizontal é
+   feito no main e nos cards, que não são sticky. */
 html,body{background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  font-size:16px;overscroll-behavior-y:none;
-  width:100%;max-width:100%;overflow-x:hidden}
+  font-size:16px;overscroll-behavior-y:none;width:100%;max-width:100%}
 body{padding-bottom:110px}
 header,main,.card{max-width:100%}
 header{position:sticky;top:0;z-index:50;background:rgba(238,241,244,.92);
@@ -68,7 +70,8 @@ header{position:sticky;top:0;z-index:50;background:rgba(238,241,244,.92);
 .filterbar button{border:none;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:800;
   cursor:pointer;background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(22,32,42,.15);flex:none}
 
-main{padding:14px 14px 0;display:flex;flex-direction:column;gap:12px;min-width:0}
+main{padding:14px 14px 0;display:flex;flex-direction:column;gap:12px;min-width:0;
+  max-width:100%;overflow-x:hidden}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
   padding:12px;box-shadow:0 1px 2px rgba(22,32,42,.05);min-width:0;overflow:hidden}
 .card h2{font-size:12px;font-weight:900;letter-spacing:.4px;color:var(--muted);display:flex;
@@ -331,7 +334,7 @@ textarea.field{min-height:100px;font-family:var(--mono);font-size:12px}
 
 <script>
 /* ====== MEU (Hudson) — recebido por data + despesas + resultado ====== */
-var APP_VER=9; var APP_DATE='13/08/2026';
+var APP_VER=10; var APP_DATE='13/08/2026';
 var KEY='meu_hudson_v1';
 var CATS=[{k:'seguro',n:'SEGUROS',ic:'🛡'},{k:'cartao',n:'CARTÕES',ic:'💳'},
           {k:'financ',n:'FINANC.',ic:'🏦'},{k:'casa',n:'CASA',ic:'🏠'},{k:'outros',n:'OUTROS',ic:'📌'}];
@@ -1014,13 +1017,20 @@ function viewDes(){
   h+='<button class="addLine" onclick="novoItem(\''+d+'\')">+ Adicionar no dia '+d+'</button></div>';
  });
  if(!mostrou)h+='<div class="card"><div class="empty">Nada neste filtro.</div></div>';
+ h+='<div class="card" id="cardResumo">'+resumoDesHTML()+'</div>';
+ return h;
+}
+function resumoDesHTML(){
  var porCat={};des().forEach(function(i){porCat[i.cat]=(porCat[i.cat]||0)+i.v});
- h+='<div class="card"><h2>📊 RESUMO POR TIPO</h2>';
+ var h='<h2>📊 RESUMO POR TIPO</h2>';
  CATS.forEach(function(c){if(porCat[c.k])h+='<div class="lin"><span class="n">'+c.ic+' '+c.n+'</span><span class="v">'+fmt(porCat[c.k])+'</span></div>'});
  var recT=0,avuT=0;des().forEach(function(i){i.rec?recT+=i.v:avuT+=i.v});
  h+='<div class="lin"><span class="n">♻️ Recorrentes (repetem todo mês)</span><span class="v">'+fmt(recT)+'</span></div>'
-  +'<div class="lin"><span class="n">⚡ Avulsas (só neste mês)</span><span class="v">'+fmt(avuT)+'</span></div></div>';
+  +'<div class="lin"><span class="n">⚡ Avulsas (só neste mês)</span><span class="v">'+fmt(avuT)+'</span></div>';
  return h;
+}
+function refreshResumo(){
+ try{var el=document.getElementById('cardResumo');if(el)el.innerHTML=resumoDesHTML()}catch(e){}
 }
 function refreshDias(){
  try{
@@ -1041,7 +1051,7 @@ function valBlurD(inp,id){
  var i=findD(id);if(!i)return;
  if(LOCK){inp.value=fmt(i.v);return}
  i.v=parseVal(inp.value);i.at=agora();inp.value=fmt(i.v);
- save();atualizaTotais();refreshDias();
+ save();atualizaTotais();refreshDias();refreshResumo();
 }
 function diaBlur(inp,id){
  var i=findD(id);if(!i)return;
@@ -1060,13 +1070,14 @@ function tglD(id){
   row.className='item'+(i.s==='paid'?' paid':'');
   var b=row.querySelector('.st');if(b){b.className='st '+i.s;b.textContent=(i.s==='paid'?'✅':'❌')}
  }catch(e){render(true);return}
- atualizaTotais();refreshDias();
+ atualizaTotais();refreshDias();refreshResumo();
 }
 function toggleRecD(id){
  if(travado())return;
  var i=findD(id);if(!i)return;
  i.rec=!i.rec;i.at=agora();save();
  try{var b=document.querySelector('.item[data-row="'+id+'"] .recbtn');if(b)b.className='recbtn'+(i.rec?' on':'')}catch(e){}
+ refreshResumo();
  toast(i.rec?'♻️ Repete todo mês':'⚡ Só neste mês');
 }
 function cicloCat(id){
@@ -1075,6 +1086,7 @@ function cicloCat(id){
  var k=0;for(var j=0;j<CATS.length;j++){if(CATS[j].k===i.cat)k=j}
  i.cat=CATS[(k+1)%CATS.length].k;i.at=agora();save();
  try{var b=document.querySelector('.item[data-row="'+id+'"] .catbtn');if(b)b.textContent=catOf(i.cat).ic}catch(e){}
+ refreshResumo();
  toast('Movida para '+catOf(i.cat).n);
 }
 function delDespesa(id){
