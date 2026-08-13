@@ -331,7 +331,7 @@ textarea.field{min-height:100px;font-family:var(--mono);font-size:12px}
 
 <script>
 /* ====== MEU (Hudson) — recebido por data + despesas + resultado ====== */
-var APP_VER=7; var APP_DATE='11/08/2026';
+var APP_VER=9; var APP_DATE='13/08/2026';
 var KEY='meu_hudson_v1';
 var CATS=[{k:'seguro',n:'SEGUROS',ic:'🛡'},{k:'cartao',n:'CARTÕES',ic:'💳'},
           {k:'financ',n:'FINANC.',ic:'🏦'},{k:'casa',n:'CASA',ic:'🏠'},{k:'outros',n:'OUTROS',ic:'📌'}];
@@ -418,7 +418,7 @@ function quartasDoMes(){
    rec = {id, dv:'dd/mm/aaaa' prevista, dp:'dd/mm/aaaa' recebida, v, desc,
           rep:'' | descrição da conta que este dinheiro paga, sem:true = repete toda semana,
           s:'paid'|'pend', at, del} */
-var state={rev:0,dev:'',month:'',recs:[],despesas:[],mHist:[],bens:[],fipeSnap:{},migs:[],semeado:false};
+var state={rev:0,dev:'',month:'',mediaSem:0,recs:[],despesas:[],mHist:[],bens:[],fipeSnap:{},migs:[],semeado:false};
 function recs(){return toArr(state.recs).filter(function(i){return i&&!i.del})}
 function des(){return toArr(state.despesas).filter(function(i){return i&&!i.del})}
 function bens(){return toArr(state.bens).filter(function(i){return i&&!i.del})}
@@ -435,6 +435,7 @@ function totaisRec(){return totais(recsMes())}
 function norm(s){
  if(!s||typeof s!=='object')s={};
  var o={rev:s.rev||0,dev:s.dev||'',semeado:!!s.semeado,month:normMes(s.month||mesAtual()),
+  mediaSem:(typeof s.mediaSem==='number'?s.mediaSem:0),
   recs:[],despesas:[],mHist:[],bens:[],fipeSnap:{},migs:[]};
  toArr(s.migs).forEach(function(m){if(m&&o.migs.indexOf(m)<0)o.migs.push(m)});
  if(s.fipeSnap&&typeof s.fipeSnap==='object'){for(var k in s.fipeSnap){if(Object.prototype.hasOwnProperty.call(s.fipeSnap,k)){
@@ -442,12 +443,13 @@ function norm(s){
  toArr(s.recs).forEach(function(i){ if(!i)return;
   o.recs.push({id:i.id||uid(),dv:i.dv||'',dp:i.dp||'',v:(typeof i.v==='number'?i.v:0),
    desc:i.desc||'',rep:i.rep||'',sem:(i.sem===undefined?false:!!i.sem),
+   nl:(i.nl===undefined?null:(i.nl===null?null:!!i.nl)),
    s:(i.s==='paid'?'paid':'pend'),at:i.at||0,del:!!i.del});
  });
  toArr(s.despesas).forEach(function(i){ if(!i)return;
   o.despesas.push({id:i.id||uid(),day:normDia(i.day),desc:i.desc||'',v:(typeof i.v==='number'?i.v:0),
    cat:(catOf(i.cat).k),s:(i.s==='paid'?'paid':'pend'),rec:(i.rec===undefined?true:!!i.rec),
-   at:i.at||0,del:!!i.del});
+   nl:(i.nl===undefined?null:(i.nl===null?null:!!i.nl)),at:i.at||0,del:!!i.del});
  });
  toArr(s.bens).forEach(function(i){ if(!i)return;
   o.bens.push({id:i.id||uid(),desc:i.desc||'',v:(typeof i.v==='number'?i.v:0),at:i.at||0,del:!!i.del});
@@ -489,29 +491,47 @@ var DESPESAS_SEED=[
  {d:'24',n:'ITAÚ',v:454314,c:'cartao',rec:true,pago:false}
 ];
 var RECS_SEED=[
- {id:'r7-01',dv:'01/08/2026',dp:'01/08/2026',v:233260,desc:'Empréstimo pai',s:'paid',sem:false},
- {id:'r7-02',dv:'05/08/2026',dp:'05/08/2026',v:70000,desc:'Bruno — OYZ-9079 · 3º 12/12',s:'paid',sem:true},
- {id:'r7-03',dv:'05/08/2026',dp:'05/08/2026',v:80000,desc:'Helton — QUB-5B64 · 1º 11/13',s:'paid',sem:true},
- {id:'r7-04',dv:'05/08/2026',dp:'05/08/2026',v:80000,desc:'Christian — RJZ-1B66 · 2º 3/14',s:'paid',sem:true},
- {id:'r7-05',dv:'05/08/2026',dp:'05/08/2026',v:40000,desc:'Salário do pai · 60/999',s:'paid',sem:true},
- {id:'r7-06',dv:'06/08/2026',dp:'06/08/2026',v:31000,desc:'Denilson — Siena · dívida 5/5',s:'paid',sem:false},
- {id:'r7-07',dv:'06/08/2026',dp:'06/08/2026',v:40000,desc:'Caio — placa de vídeo e mouse',s:'paid',sem:false},
- {id:'r7-08',dv:'07/08/2026',dp:'07/08/2026',v:205000,desc:'Caio — placa de vídeo e mouse',s:'paid',sem:false},
- {id:'r7-09',dv:'08/08/2026',dp:'08/08/2026',v:29347,desc:'Multa Mobi — Christian',s:'paid',sem:false},
- {id:'r7-10',dv:'12/08/2026',dp:'',v:70000,desc:'Bruno — OYZ-9079 · 4º 1/3',s:'pend',sem:true},
- {id:'r7-11',dv:'12/08/2026',dp:'',v:80000,desc:'Helton — QUB-5B64 · 1º 12/13',s:'pend',sem:true},
- {id:'r7-12',dv:'12/08/2026',dp:'',v:80000,desc:'Christian — RJZ-1B66 · 2º 4/14',s:'pend',sem:true},
- {id:'r7-13',dv:'12/08/2026',dp:'',v:40000,desc:'Salário do pai · 61/999',s:'pend',sem:true},
- {id:'r7-14',dv:'15/08/2026',dp:'',v:29350,desc:'Multa Mobi — Christian',s:'pend',sem:false},
- {id:'r7-15',dv:'19/08/2026',dp:'',v:70000,desc:'Bruno — OYZ-9079 · 4º 2/3',s:'pend',sem:true},
- {id:'r7-16',dv:'19/08/2026',dp:'',v:80000,desc:'Helton — QUB-5B64 · 1º 13/13',s:'pend',sem:true},
- {id:'r7-17',dv:'19/08/2026',dp:'',v:80000,desc:'Christian — RJZ-1B66 · 2º 5/14',s:'pend',sem:true},
- {id:'r7-18',dv:'19/08/2026',dp:'',v:40000,desc:'Salário do pai · 62/999',s:'pend',sem:true},
- {id:'r7-19',dv:'24/08/2026',dp:'',v:298300,desc:'Pai — paga o cartão Itaú · 4/4',rep:'ITAÚ',s:'pend',sem:false},
- {id:'r7-20',dv:'26/08/2026',dp:'',v:70000,desc:'Bruno — OYZ-9079 · 4º 3/3',s:'pend',sem:true},
- {id:'r7-21',dv:'26/08/2026',dp:'',v:80000,desc:'Helton — QUB-5B64 · 2º 1/13',s:'pend',sem:true},
- {id:'r7-22',dv:'26/08/2026',dp:'',v:80000,desc:'Christian — RJZ-1B66 · 2º 6/14',s:'pend',sem:true},
- {id:'r7-23',dv:'26/08/2026',dp:'',v:40000,desc:'Salário do pai · 63/999',s:'pend',sem:true}
+ {id:'r9-01',dv:'01/08/2026',v:233260,desc:'Empréstimo pai',s:'paid'},
+ {id:'r9-02',dv:'05/08/2026',v:70000,desc:'Bruno — OYZ-9079 · 3º 12/12',s:'paid',sem:true},
+ {id:'r9-03',dv:'05/08/2026',v:80000,desc:'Christian — RJZ-1B66 · 2º 3/14',s:'paid',sem:true},
+ {id:'r9-04',dv:'05/08/2026',v:80000,desc:'Helton — QUB-5B64 · 1º 11/13',s:'paid',sem:true},
+ {id:'r9-05',dv:'05/08/2026',v:40000,desc:'Salário do pai · 60/999',s:'paid',sem:true},
+ {id:'r9-06',dv:'05/08/2026',v:21,desc:'?',s:'paid'},
+ {id:'r9-07',dv:'06/08/2026',v:31000,desc:'Denilson — Siena · dívida 5/5',s:'paid'},
+ {id:'r9-08',dv:'06/08/2026',v:40000,desc:'Caio — placa de vídeo e mouse',s:'paid'},
+ {id:'r9-09',dv:'07/08/2026',v:205000,desc:'Caio — placa de vídeo e mouse',s:'paid'},
+ {id:'r9-10',dv:'08/08/2026',v:29347,desc:'Multa Mobi — Christian',s:'paid'},
+ {id:'r9-11',dv:'11/08/2026',v:80000,desc:'Helton — QUB-5B64 · 1º 12/13',s:'paid',sem:true},
+ {id:'r9-12',dv:'12/08/2026',v:0,desc:'Bruno — OYZ-9079 · 4º 1/3',s:'paid',sem:true},
+ {id:'r9-13',dv:'12/08/2026',v:80000,desc:'Christian — RJZ-1B66 · 2º 4/14',s:'paid',sem:true},
+ {id:'r9-14',dv:'12/08/2026',v:40000,desc:'Salário do pai · 61/999',s:'paid',sem:true},
+ {id:'r9-15',dv:'15/08/2026',v:29350,desc:'Multa Mobi — Christian',s:'pend'},
+ {id:'r9-16',dv:'19/08/2026',v:65350,desc:'Bruno — OYZ-9079 · 4º 2/3',s:'pend',sem:true},
+ {id:'r9-17',dv:'19/08/2026',v:80000,desc:'Christian — RJZ-1B66 · 2º 5/14',s:'pend',sem:true},
+ {id:'r9-18',dv:'19/08/2026',v:80000,desc:'Helton — QUB-5B64 · 1º 13/13',s:'pend',sem:true},
+ {id:'r9-19',dv:'19/08/2026',v:40000,desc:'Salário do pai · 62/999',s:'pend',sem:true},
+ {id:'r9-20',dv:'24/08/2026',v:298300,desc:'Pai — paga o cartão Itaú · 4/4',rep:'ITAÚ',s:'pend'},
+ {id:'r9-21',dv:'26/08/2026',v:70000,desc:'Bruno — OYZ-9079 · 4º 3/3',s:'pend',sem:true},
+ {id:'r9-22',dv:'26/08/2026',v:80000,desc:'Christian — RJZ-1B66 · 2º 6/14',s:'pend',sem:true},
+ {id:'r9-23',dv:'26/08/2026',v:80000,desc:'Helton — QUB-5B64 · 2º 1/13',s:'pend',sem:true},
+ {id:'r9-24',dv:'26/08/2026',v:40000,desc:'Salário do pai · 63/999',s:'pend',sem:true}
+];
+var DESP_SEED9=[
+ ['01','Bradesco',480245,'cartao',1,1],['01','NUBANK',12080,'cartao',1,1],
+ ['05','Devolver pai',232821,'outros',0,1],['05','Seguro Cobalt — OYZ-9079',20500,'seguro',1,1],
+ ['05','Seguro Fiesta — LQZ-6C72',16700,'seguro',1,1],['08','?',3000,'outros',0,1],
+ ['10','Plano Claro Internet Empresa',5990,'casa',1,1],['10','Plano Vivo internet + Spotify',16600,'casa',1,1],
+ ['11','Esther',5000,'outros',0,1],['11','SANTANDER',283749,'cartao',1,1],
+ ['12','Amazon Bradesco',33253,'cartao',1,1],['12','Conta de Luz',24161,'casa',1,1],
+ ['12','Financiamento Mobi RJZ (5/48)',103283,'financ',1,1],
+ ['16','Financiamento Onix QUB (5/48)',154798,'financ',1,0],
+ ['17','Internet leste telecom',19999,'casa',1,0],['17','Seguro iPhone (1/12)',10602,'outros',1,0],
+ ['20','Seguro Mobi — RJZ-1B66',20088,'seguro',1,0],['20','Seguro Onix — QUB-5B64',23096,'seguro',1,0],
+ ['24','ITAÚ',454314,'cartao',1,0]
+];
+var MESES_SEED9=[
+ {id:'mh-jul26',month:'JULHO/2026',closedAt:'13/08/2026',ganhos:1388072,despesas:1841747},
+ {id:'mh-jun26',month:'JUNHO/2026',closedAt:'13/08/2026',ganhos:1390467,despesas:1551272}
 ];
 function semear(){
  if(state.semeado)return;
@@ -521,20 +541,70 @@ function semear(){
 }
 function migrar(){
  state.migs=toArr(state.migs);
- if(state.migs.indexOf('m7')>=0)return false;
+ if(state.migs.indexOf('m9')>=0)return false;
  /* apaga os modelos antigos (entradas/fontes) e escreve a lista por data */
  delete state.entradas; delete state.wHist; delete state.fontes;
  state.recs=toArr(state.recs);
  state.recs.forEach(function(r){if(r&&!r.del){r.del=true;r.at=agora()}});
  RECS_SEED.forEach(function(r){
-  state.recs.push({id:r.id,dv:r.dv,dp:r.dp||'',v:r.v,desc:r.desc,rep:r.rep||'',
-   sem:!!r.sem,s:r.s,at:agora(),del:false});
+  state.recs.push({id:r.id,dv:r.dv,dp:(r.s==='paid'?r.dv:''),v:r.v,desc:r.desc,rep:r.rep||'',
+   sem:!!r.sem,nl:null,s:r.s,at:agora(),del:false});
  });
- toArr(state.despesas).forEach(function(d){if(d&&!d.del&&/vivo/i.test(d.desc||'')){d.v=16600;d.at=agora()}});
+ /* despesas de agosto refeitas pelo extrato */
+ state.despesas=toArr(state.despesas);
+ state.despesas.forEach(function(d){if(d&&!d.del){d.del=true;d.at=agora()}});
+ DESP_SEED9.forEach(function(d,n){
+  state.despesas.push({id:'d9-'+n,day:d[0],desc:d[1],v:d[2],cat:d[3],
+   s:(d[5]?'paid':'pend'),rec:!!d[4],nl:null,at:agora(),del:false});
+ });
+ /* junho e julho já fechados */
+ state.mHist=toArr(state.mHist).filter(function(m){
+  return m&&m.month!=='JULHO/2026'&&m.month!=='JUNHO/2026';
+ });
+ MESES_SEED9.forEach(function(m){
+  state.mHist.push({id:m.id,month:m.month,closedAt:m.closedAt,ganhos:m.ganhos,
+   despesas:m.despesas,manual:true});
+ });
  state.month=normMes('AGOSTO/2026');
- state.migs.push('m7');
+ state.migs.push('m9');
  touch();persist();schedulePush();
  return true;
+}
+
+/* ---------- EMPRÉSTIMO: dinheiro que não é lucro ----------
+   Pegar emprestado (maquininha, cartão, com o pai) não é receita: é dívida que
+   cai na conta. E devolver esse dinheiro não é despesa do mês. O app reconhece
+   sozinho pelo nome; dá para forçar nos dois sentidos. */
+function semAcento(t){
+ return String(t||'').toLowerCase().replace(/[áàâã]/g,'a').replace(/[éèê]/g,'e')
+  .replace(/[íï]/g,'i').replace(/[óòôõ]/g,'o').replace(/[úü]/g,'u').replace(/ç/g,'c');
+}
+function pareceEmprestimo(t){return /emprestimo|emprestado/.test(semAcento(t))}
+function pareceDevolucao(t){var x=semAcento(t);return /devolver|devolucao|devolvi/.test(x)||pareceEmprestimo(x)}
+function recEhEmp(r){return (r.nl===null||r.nl===undefined)?pareceEmprestimo(r.desc):!!r.nl}
+function desEhDev(i){return (i.nl===null||i.nl===undefined)?pareceDevolucao(i.desc):!!i.nl}
+function totalEmp(){
+ var p=0,q=0;
+ recsMes().forEach(function(r){if(!recEhEmp(r))return;if(r.s==='paid')p+=r.v;else q+=r.v});
+ return {pago:p,pend:q,all:p+q};
+}
+function totalDev(){
+ var p=0,q=0;
+ des().forEach(function(i){if(!desEhDev(i))return;if(i.s==='paid')p+=i.v;else q+=i.v});
+ return {pago:p,pend:q,all:p+q};
+}
+/* o pai às vezes manda mais do que a fatura do Itaú daquele mês:
+   o excedente zera a conta e vira ganho de verdade. */
+function sobraRep(){
+ var m=repPorConta(),o={pago:0,pend:0,all:0},contas={};
+ des().forEach(function(i){var k=String(i.desc||'');contas[k]=(contas[k]||0)+i.v});
+ for(var k in m){
+  var ex=m[k].all-(contas[k]||0);
+  if(ex<=0)continue;
+  var pp=Math.min(ex,m[k].pago);
+  o.pago+=pp;o.pend+=(ex-pp);o.all+=ex;
+ }
+ return o;
 }
 
 /* ---------- repasse: dinheiro de passagem ----------
@@ -542,7 +612,7 @@ function migrar(){
 function repPorConta(){
  var m={};
  recsMes().forEach(function(r){
-  if(!r.rep)return;
+  if(!r.rep||recEhEmp(r))return;
   var k=String(r.rep);
   if(!m[k])m[k]={pago:0,pend:0,all:0};
   if(r.s==='paid')m[k].pago+=r.v; else m[k].pend+=r.v;
@@ -552,11 +622,15 @@ function repPorConta(){
 }
 function totalRep(){var m=repPorConta(),o={pago:0,pend:0,all:0};
  for(var k in m){o.pago+=m[k].pago;o.pend+=m[k].pend;o.all+=m[k].all}return o}
-function recLiq(){var r=totaisRec(),p=totalRep();return {pago:r.pago-p.pago,pend:r.pend-p.pend,all:r.all-p.all}}
+function recLiq(){
+ var r=totaisRec(),p=totalRep(),e=totalEmp(),sb=sobraRep();
+ return {pago:r.pago-p.pago-e.pago+sb.pago,pend:r.pend-p.pend-e.pend+sb.pend,all:r.all-p.all-e.all+sb.all};
+}
 function desLiq(){
  var m=repPorConta(),poolP={},poolQ={};
  for(var k in m){poolP[k]=m[k].pago;poolQ[k]=m[k].pend}
- var red={},lista=des().slice().sort(function(a,b){return (parseInt(a.day,10)||99)-(parseInt(b.day,10)||99)});
+ var red={},lista=des().filter(function(i){return !desEhDev(i)})
+   .slice().sort(function(a,b){return (parseInt(a.day,10)||99)-(parseInt(b.day,10)||99)});
  function aplica(pool,cond){
   lista.forEach(function(i){
    if(!cond(i))return;
@@ -575,6 +649,58 @@ function desLiq(){
   if(i.s==='paid')pago+=v;else pend+=v;
  });
  return {pago:pago,pend:pend,all:all,red:red};
+}
+
+/* ---------- previsão das semanas que ainda não foram lançadas ----------
+   Igual ao app do pai: o mês tem 4 ou 5 quartas; as que ainda não têm lançamento
+   entram como previsão, para a sobra do fim do mês não ficar menor que a realidade. */
+function ehQuarta(d){var o=dObj(d);return !!o&&o.getDay()===3}
+function ultimaQuartaLancada(){
+ var melhor=null,md=null;
+ recs().forEach(function(r){
+  if(!ehQuarta(r.dv))return;
+  var d=dObj(r.dv);
+  if(!md||d>md){md=d;melhor=r.dv}
+ });
+ return melhor;
+}
+function mediaAutomatica(){
+ var q=ultimaQuartaLancada(); if(!q)return 0;
+ var t=0;
+ recs().forEach(function(r){ if(r.sem&&r.dv===q&&!r.rep)t+=r.v });
+ return t;
+}
+function mediaSemanal(){ return state.mediaSem||mediaAutomatica() }
+function origemMedia(){
+ if(state.mediaSem)return 'definida por você';
+ var q=ultimaQuartaLancada();
+ return q?('base: a semana de '+dataCurta(q)):'ainda não há semana lançada';
+}
+function semanasProjetadas(){
+ var m=mediaSemanal(); if(m<=0)return [];
+ return quartasFaltando().map(function(q){return {dv:q,v:m}});
+}
+function totalProjetado(){var t=0;semanasProjetadas().forEach(function(x){t+=x.v});return t}
+function mudarMedia(){
+ if(travado())return;
+ pedeNum('Semana típica','Quanto costuma entrar numa semana cheia. Serve só para prever as semanas que ainda não foram lançadas. Deixe 0 para o app calcular sozinho pela última semana.',
+  (state.mediaSem?(state.mediaSem/100).toFixed(2).replace('.',','):''),
+  function(v){state.mediaSem=v;save();render(true);toast('Previsão atualizada')});
+}
+
+/* ---------- recebimento parcial ---------- */
+function openParcial(id){
+ if(travado())return;
+ var r=findR(id); if(!r||r.s==='paid')return;
+ pedeNum('Recebeu só uma parte?','Quanto entrou agora de '+fmt(r.v)+'. O resto continua pendente na mesma data.','',
+  function(pago){
+   if(pago<=0){toast('⚠️ Valor inválido');return}
+   if(pago>=r.v){r.s='paid';r.dp=r.dv||stamp();r.at=agora();save();render(true);toast('Marcado como recebido');return}
+   r.v=r.v-pago; r.at=agora();
+   state.recs.push({id:uid(),dv:r.dv,dp:stamp(),v:pago,desc:(r.desc||'')+' — parcial',
+    rep:r.rep||'',sem:false,s:'paid',at:agora(),del:false});
+   save();render(true);toast('Parcial de '+fmt(pago)+' registrado');
+ });
 }
 
 /* ---------- trava ---------- */
@@ -657,14 +783,16 @@ function passaFiltro(i){return filtro==='all'||(filtro==='paid'?i.s==='paid':i.s
 /* ---------- ABA 1: RECEBIDO (mesmo formato da aba de despesas) ---------- */
 function linhaRec(r){
  return '<div class="item'+(r.s==='paid'?' paid':'')+'" data-row="'+r.id+'">'
-  +'<button class="catbtn'+(r.rep?' on':'')+'" onclick="openRep(\''+r.id+'\')" title="Dinheiro de passagem">'+(r.rep?'🔁':'🚗')+'</button>'
+  +'<button class="catbtn'+((r.rep||recEhEmp(r))?' on':'')+'" onclick="openRep(\''+r.id+'\')" title="O que é esse dinheiro">'+(recEhEmp(r)?'🏦':(r.rep?'🔁':'🚗'))+'</button>'
   +'<input class="dt" value="'+esc(dataCurta(dataDe(r)))+'" inputmode="numeric" placeholder="--/--" onfocus="this.select()" onblur="dtBlur(this,\''+r.id+'\')">'
   +'<input class="desc" value="'+esc(r.desc)+'" placeholder="quem pagou / o quê" oninput="setDescR(\''+r.id+'\',this.value)">'
   +'<input class="val" value="'+fmt(r.v)+'" inputmode="text" onfocus="this.select()" onblur="valBlurR(this,\''+r.id+'\')">'
-  +'<button class="recbtn'+(r.sem?' on':'')+'" onclick="toggleSem(\''+r.id+'\')" title="Toda semana">♻️</button>'
+  +(r.s==='pend'&&r.v>0?'<button class="recbtn on" onclick="openParcial(\''+r.id+'\')" title="Recebeu só uma parte">💰</button>'
+                       :'<button class="recbtn'+(r.sem?' on':'')+'" onclick="toggleSem(\''+r.id+'\')" title="Toda semana">♻️</button>')
   +'<button class="st '+r.s+'" onclick="tglR(\''+r.id+'\')">'+(r.s==='paid'?'✅':'❌')+'</button>'
   +'<button class="del" onclick="delRec(\''+r.id+'\')">×</button></div>'
-  +(r.rep?'<div class="repline">🔁 não conta como ganho — abate de '+esc(r.rep)+'</div>':'');
+  +(recEhEmp(r)?'<div class="repline">🏦 empréstimo — não é lucro, fica fora da soma</div>'
+    :(r.rep?'<div class="repline">🔁 não conta como ganho — abate de '+esc(r.rep)+'</div>':''));
 }
 function proximaQuarta(){
  var falta=quartasFaltando();
@@ -682,12 +810,7 @@ function quartasFaltando(){
 function viewRec(){
  var lista=recsMes();
  if(!lista.length&&!recs().length) return '<div class="card"><div class="empty">Nenhum recebimento ainda.<br>Toque em <b>＋ Recebimento</b>.</div></div>';
- var h='';
- var falta=quartasFaltando();
- if(falta.length){
-  h+='<div class="hint">📅 Faltam as semanas de <b>'+falta.map(dataCurta).join(', ')+'</b>. Sem elas a previsão do Resultado fica menor do que a realidade.'
-   +'<br><button onclick="gerarProximaSemana()">🔁 Lançar semana de '+dataCurta(proximaQuarta())+'</button></div>';
- }
+ var h=cardSemanas();
  var datas=[];
  lista.forEach(function(r){var d=dataDe(r);if(datas.indexOf(d)<0)datas.push(d)});
  datas.sort(function(a,b){return diaDe(a)-diaDe(b)});
@@ -706,12 +829,39 @@ function viewRec(){
   h+='<button class="addLine" onclick="novoRec(\''+d+'\')">+ Adicionar em '+esc(dataCurta(d))+'</button></div>';
  });
  if(!mostrou)h+='<div class="card"><div class="empty">Nada em '+esc(mesInfo().nome)+' neste filtro.</div></div>';
+ var ep=totalEmp();
+ if(ep.all)h+='<div class="card"><h2>🏦 EMPRÉSTIMOS DO MÊS</h2>'
+  +'<div class="subtxt" style="margin:0">'+fmt(ep.all)+' entraram como empréstimo. Estão escritos por inteiro acima, mas não somam no lucro — é dinheiro que você pegou, não que ganhou. A devolução também sai das despesas.</div></div>';
  var rp=totalRep();
  if(rp.all)h+='<div class="card"><h2>🔁 DINHEIRO DE PASSAGEM</h2>'
   +'<div class="subtxt" style="margin:0">'+fmt(rp.all)+' entram só para pagar contas. Estão escritos por inteiro acima, mas o Resultado não conta como ganho e abate esse valor da conta correspondente.</div></div>';
  var fora=foraDoMes();
  if(fora)h+='<div class="card"><div class="subtxt" style="margin:0">📦 '+fora+' lançamento(s) em outros meses. Troque o mês no topo para vê-los.</div></div>';
  return h;
+}
+/* resumo das quartas do mês — dá o mesmo panorama do app Semanal do pai */
+function cardSemanas(){
+ var qs=quartasDoMes(); if(!qs.length)return '';
+ var m=mediaSemanal(), falta=quartasFaltando();
+ var h='<div class="card"><h2><span>📆 SEMANAS DE '+esc(mesInfo().mes)+'</span><span class="sub">'+qs.length+'</span></h2>';
+ qs.forEach(function(q){
+  var doDia=recs().filter(function(r){return r.dv===q});
+  if(doDia.length){
+   var t=totais(doDia);
+   h+='<div class="lin"><span class="n">'+(t.pend===0?'✅':'⏳')+' '+esc(dataCurta(q))
+    +' · '+doDia.length+' lançamento'+(doDia.length>1?'s':'')+'</span>'
+    +'<span class="v '+(t.pend===0?'g':'')+'">'+fmt(t.all)+'</span></div>';
+  }else{
+   h+='<div class="lin"><span class="n">📋 '+esc(dataCurta(q))+' · ainda não lançada</span>'
+    +'<span class="v a">'+(m?fmt(m)+' prev.':'—')+'</span></div>';
+  }
+ });
+ if(falta.length){
+  h+='<div class="subtxt">'+falta.length+' semana'+(falta.length>1?'s':'')+' sem lançamento. O Resultado já conta '
+   +fmt(totalProjetado())+' de previsão por elas ('+esc(origemMedia())+').</div>'
+   +'<button class="addLine" onclick="gerarProximaSemana()">🔁 Lançar a semana de '+dataCurta(proximaQuarta())+'</button>';
+ }else h+='<div class="subtxt">✓ Todas as semanas do mês já estão lançadas.</div>';
+ return h+'</div>';
 }
 function refreshDatas(){
  try{
@@ -786,14 +936,8 @@ function novoRec(data){
 function gerarProximaSemana(){
  if(travado())return;
  var q=proximaQuarta();
- var base={},ultima=null;
- recs().forEach(function(r){
-  if(!r.sem)return;
-  var d=dObj(r.dv);if(!d||d.getDay()!==3)return;
-  if(!ultima||d>ultima)ultima=d;
- });
- if(!ultima){toast('⚠️ Marque ♻️ nos recebimentos que repetem');return}
- var alvo=dTxt(ultima);
+ var alvo=ultimaQuartaLancada();
+ if(!alvo){toast('⚠️ Marque ♻️ nos recebimentos que repetem');return}
  var modelo=recs().filter(function(r){return r.sem&&r.dv===alvo});
  var ja=recs().filter(function(r){return r.dv===q}).length;
  if(ja){toast('A semana de '+dataCurta(q)+' já tem lançamento');return}
@@ -813,16 +957,26 @@ function openRep(id){
   var idx=REP_OPTS.length;REP_OPTS.push(k);
   h+='<button class="'+(r.rep===k?'sel':'')+'" onclick="setRep('+idx+')">'+(r.rep===k?'🔁 ':'')+esc(k)+' · dia '+esc(i.day||'--')+' · '+fmt(i.v)+'</button>';
  });
- h='<button onclick="setRep(-1)">🚗 Não é passagem — é ganho meu</button>'+h;
+ h='<button class="'+(recEhEmp(r)?'sel':'')+'" onclick="setRep(-2)">🏦 É empréstimo — não é lucro</button>'
+   +'<button class="'+((!r.rep&&!recEhEmp(r))?'sel':'')+'" onclick="setRep(-1)">🚗 Ganho meu de verdade</button>'+h;
  document.getElementById('repList').innerHTML=h;
  document.getElementById('ovRep').classList.add('open');
 }
 function setRep(i){
  var r=findR(REP_CTX);if(!r)return;
- r.rep=(i<0?'':(REP_OPTS[i]||''));r.at=agora();save();
+ if(i===-2){ r.nl=true; r.rep=''; }
+ else if(i===-1){ r.nl=false; r.rep=''; }
+ else { r.nl=false; r.rep=(REP_OPTS[i]||''); }
+ r.at=agora();save();
  document.getElementById('ovRep').classList.remove('open');
  render(true);
- toast(r.rep?('🔁 Abate de '+r.rep):'Voltou a contar como ganho');
+ toast(r.nl?'🏦 Empréstimo — fora do lucro':(r.rep?('🔁 Abate de '+r.rep):'Conta como ganho'));
+}
+function togDev(id){
+ if(travado())return;
+ var i=findD(id);if(!i)return;
+ i.nl=!desEhDev(i);i.at=agora();save();render(true);
+ toast(i.nl?'🏦 Fora da soma (devolução)':'Volta a contar como despesa');
 }
 
 /* ---------- ABA 2: DESPESAS ---------- */
@@ -836,7 +990,8 @@ function linhaDespesa(i,red){
   +'<button class="recbtn'+(i.rec?' on':'')+'" onclick="toggleRecD(\''+i.id+'\')">♻️</button>'
   +'<button class="st '+i.s+'" onclick="tglD(\''+i.id+'\')">'+(i.s==='paid'?'✅':'❌')+'</button>'
   +'<button class="del" onclick="delDespesa(\''+i.id+'\')">×</button></div>'
-  +(red?'<div class="repline">🔁 '+fmt(red)+' vêm de fora — no Resultado esta conta pesa '+fmt(i.v-red)+'</div>':'');
+  +(desEhDev(i)?'<div class="repline" onclick="togDev(\''+i.id+'\')">🏦 devolução de empréstimo — fora da soma (toque para mudar)</div>'
+    :(red?'<div class="repline">🔁 '+fmt(red)+' vêm de fora — no Resultado esta conta pesa '+fmt(i.v-red)+'</div>':''));
 }
 function viewDes(){
  if(!des().length)return '<div class="card"><div class="empty">Nenhuma despesa ainda.<br>Toque em <b>＋ Despesa</b>.</div></div>';
@@ -997,9 +1152,12 @@ function calc(){
  var mi=mesInfo();
  var rb=totaisRec(),db=totais(des()),rep=totalRep();
  var r=recLiq(),d=desLiq();
+ var proj=totalProjetado(), nproj=semanasProjetadas().length;
+ var emp=totalEmp(), dev=totalDev(), sb=sobraRep();
  var saldo=r.pago-d.pago;
- var sobra=saldo+r.pend-d.pend;
- return {mi:mi,r:r,d:d,rb:rb,db:db,rep:rep,entrou:r.pago,saiu:d.pago,saldo:saldo,sobra:sobra};
+ var sobra=saldo+r.pend+proj-d.pend;
+ return {mi:mi,r:r,d:d,rb:rb,db:db,rep:rep,emp:emp,dev:dev,sb:sb,proj:proj,nproj:nproj,
+   entrou:r.pago,saiu:d.pago,saldo:saldo,sobra:sobra};
 }
 function diaADia(c){
  var evs=[];
@@ -1007,6 +1165,7 @@ function diaADia(c){
   if(r.s==='paid'||r.rep)return;
   evs.push({dia:diaDe(r.dv),v:r.v});
  });
+ semanasProjetadas().forEach(function(x){ evs.push({dia:diaDe(x.dv),v:x.v}) });
  evs.sort(function(a,b){return a.dia-b.dia});
  var porDia={},dias=[];
  des().filter(function(i){return i.s!=='paid'}).forEach(function(i){
@@ -1039,19 +1198,22 @@ function viewSaldo(){
  h+='<div class="card"><h2>DE ONDE VEM ESSE VALOR</h2>'
   +'<div class="subtxt" style="margin:0 0 8px">Cada recebimento entra no mês da data em que caiu na conta.</div>'
   +'<div class="lin"><span class="n">Recebido no mês</span><span class="v g">'+fmt(c.rb.pago)+'</span></div>';
+ if(c.emp.pago)h+='<div class="lin"><span class="n">− 🏦 empréstimos (não é lucro)</span><span class="v a">'+fmt(c.emp.pago)+'</span></div>';
  if(c.rep.pago)h+='<div class="lin"><span class="n">− 🔁 dinheiro de passagem (não é ganho)</span><span class="v a">'+fmt(c.rep.pago)+'</span></div>';
+ if(c.sb.pago)h+='<div class="lin"><span class="n">+ sobra do repasse (virou ganho)</span><span class="v g">'+fmt(c.sb.pago)+'</span></div>';
  h+='<div class="lin"><span class="n">Contas já pagas no mês</span><span class="v r">'+fmt(c.db.pago)+'</span></div>';
- if(c.db.pago!==c.d.pago)h+='<div class="lin"><span class="n">− 🔁 parte paga com dinheiro de passagem</span><span class="v a">'+fmt(c.db.pago-c.d.pago)+'</span></div>';
+ if(c.dev.pago)h+='<div class="lin"><span class="n">− 🏦 devolução de empréstimo</span><span class="v a">'+fmt(c.dev.pago)+'</span></div>';
+ if((c.db.pago-c.dev.pago)!==c.d.pago)h+='<div class="lin"><span class="n">− 🔁 parte paga com dinheiro de passagem</span><span class="v a">'+fmt(c.db.pago-c.dev.pago-c.d.pago)+'</span></div>';
  h+='<div class="totrow"><span>Saldo do mês</span><span class="v '+(c.saldo<0?'r':'g')+'">'+fmt(c.saldo)+'</span></div></div>';
  h+='<div class="card"><h2>ATÉ O FIM DO MÊS</h2>'
   +'<div class="lin"><span class="n">Saldo de hoje</span><span class="v '+(c.saldo<0?'r':'g')+'">'+fmt(c.saldo)+'</span></div>'
   +'<div class="lin"><span class="n">+ Ainda vou receber</span><span class="v g">'+fmt(c.r.pend)+'</span></div>';
  if(c.rep.pend)h+='<div class="subtxt" style="margin:2px 0 6px">'+fmt(c.rb.pend)+' entram, mas '+fmt(c.rep.pend)+' são de passagem 🔁</div>';
+ if(c.nproj)h+='<div class="lin"><span class="n">+ '+c.nproj+' semana(s) ainda não lançada(s)</span><span class="v g">'+fmt(c.proj)+'</span></div>';
  h+='<div class="lin"><span class="n">− Contas ainda não pagas</span><span class="v r">'+fmt(c.d.pend)+'</span></div>';
  if(c.db.pend!==c.d.pend)h+='<div class="subtxt" style="margin:2px 0 6px">'+fmt(c.db.pend)+' de contas, menos '+fmt(c.db.pend-c.d.pend)+' que o dinheiro de passagem já cobre 🔁</div>';
  h+='<div class="totrow"><span>Sobra prevista no fim do mês</span><span class="v '+(c.sobra<0?'r':'g')+'">'+fmt(c.sobra)+'</span></div>';
- var falta=quartasFaltando();
- if(falta.length)h+='<div class="subtxt">⚠️ Faltam as semanas de <b>'+falta.map(dataCurta).join(', ')+'</b>. Até lançar, esta previsão está incompleta.</div>';
+ if(c.nproj)h+='<div class="subtxt">Semana típica '+fmt(mediaSemanal())+' ('+esc(origemMedia())+') <button class="mini" onclick="mudarMedia()">alterar</button></div>';
  h+='</div>';
  var dd=diaADia(c);
  if(dd.linhas.length){
@@ -1091,9 +1253,10 @@ function viewMes(){
   +'<div class="lin"><span class="n">Pago (já descontado o que veio de fora)</span><span class="v r">'+fmt(c.saiu)+'</span></div>'
   +'<div class="totrow"><span>Resultado parcial</span><span class="v '+(c.saldo<0?'r':'g')+'">'+fmt(c.saldo)+'</span></div></div>';
  h+='<div class="card"><h2>SE TUDO ENTRAR E TUDO FOR PAGO</h2>'
-  +'<div class="lin"><span class="n">Recebimentos do mês</span><span class="v g">'+fmt(c.r.all)+'</span></div>'
+  +'<div class="lin"><span class="n">Recebimentos lançados</span><span class="v g">'+fmt(c.r.all)+'</span></div>'
+  +(c.nproj?'<div class="lin"><span class="n">+ '+c.nproj+' semana(s) prevista(s)</span><span class="v g">'+fmt(c.proj)+'</span></div>':'')
   +'<div class="lin"><span class="n">Despesas do mês</span><span class="v r">'+fmt(c.d.all)+'</span></div>'
-  +'<div class="totrow"><span>Resultado previsto</span><span class="v '+((c.r.all-c.d.all)<0?'r':'g')+'">'+fmt(c.r.all-c.d.all)+'</span></div>';
+  +'<div class="totrow"><span>Resultado previsto</span><span class="v '+((c.r.all+c.proj-c.d.all)<0?'r':'g')+'">'+fmt(c.r.all+c.proj-c.d.all)+'</span></div>';
  if(c.rep.all)h+='<div class="subtxt">🔁 '+fmt(c.rep.all)+' de dinheiro de passagem já foram tirados dos dois lados. Na tela de recebimentos e de despesas os valores continuam cheios ('+fmt(c.rb.all)+' e '+fmt(c.db.all)+').</div>';
  h+='</div>';
  var g=c.entrou,p=c.saiu,n=1;
@@ -1102,9 +1265,11 @@ function viewMes(){
   +'<div class="lin"><span class="n">Ganhos ('+n+' '+(n===1?'mês':'meses')+')</span><span class="v g">'+fmt(g)+'</span></div>'
   +'<div class="lin"><span class="n">Despesas</span><span class="v r">'+fmt(p)+'</span></div>'
   +'<div class="totrow"><span>Resultado acumulado</span><span class="v '+((g-p)<0?'r':'g')+'">'+fmt(g-p)+'</span></div></div>';
- h+='<div class="card"><h2>MESES FECHADOS</h2>';
+ h+='<div class="card"><h2>MÊS A MÊS</h2>';
+ h+='<div class="lin"><span class="n">'+esc(c.mi.nome)+' <span class="chip">em andamento</span></span>'
+  +'<span class="v '+(c.saldo<0?'r':'g')+'">'+fmt(c.saldo)+'</span></div>'
+  +'<div class="subtxt" style="margin:0 0 6px">Ganhos '+fmt(c.entrou)+' · Despesas '+fmt(c.saiu)+'</div>';
  var mh=toArr(state.mHist);
- if(!mh.length)h+='<div class="empty">Nenhum mês fechado ainda.</div>';
  mh.forEach(function(m){
   var r=(m.ganhos||0)-(m.despesas||0);
   h+='<div class="lin"><span class="n">'+esc(m.month)+(m.manual?' <span class="chip">à mão</span>':'')+'</span>'
@@ -1268,6 +1433,8 @@ function textoResumo(){
  L.push('');
  L.push('Recebido: '+fmt(c.rb.pago)+' · a receber: '+fmt(c.rb.pend));
  if(c.rep.all)L.push('🔁 De passagem (não é ganho): '+fmt(c.rep.all));
+ if(c.emp.all)L.push('🏦 Empréstimos (fora do lucro): '+fmt(c.emp.all));
+ if(c.nproj)L.push('📋 '+c.nproj+' semana(s) ainda não lançada(s): '+fmt(c.proj)+' de previsão');
  L.push('Contas pagas: '+fmt(c.db.pago)+' · a pagar: '+fmt(c.db.pend));
  L.push('Saldo do mês: '+fmt(c.saldo));
  L.push('Sobra prevista: '+fmt(c.sobra));
@@ -1307,7 +1474,7 @@ function mesclar(remoto,local){
  o.recs=mesclarLista(remoto.recs,local.recs);
  o.despesas=mesclarLista(remoto.despesas,local.despesas);
  o.bens=mesclarLista(remoto.bens,local.bens);
- ['mHist','fipeSnap','migs','semeado'].forEach(function(k){
+ ['mHist','fipeSnap','migs','semeado','mediaSem'].forEach(function(k){
   if((remoto[k]===undefined||remoto[k]===null)&&local[k]!==undefined)o[k]=local[k];
  });
  return o;
