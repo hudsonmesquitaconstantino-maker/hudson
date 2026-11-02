@@ -280,7 +280,7 @@ function itensMes(ym){
   if(k.devido<=0&&!k.rs.length){out.push(Object.assign(base,inf.status==='adiantado'?{valor:0,resta:0,cert:'certo',status:'adiantado'}:{valor:0,resta:0,cert:'certo',status:'parado',semContrato:inf.status==='semContrato'}));return}
   if(k.restaSem<=0)out.push(Object.assign(base,{valor:Math.min(k.rec,Math.max(0,k.devido-k.abat))||k.rec,resta:0,cert:'certo',status:'pago'}));
   else out.push(Object.assign(base,{valor:k.devido,resta:k.restaSem,cert:car.incerto?'incerta':'provavel',status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}));
-  if(k.multa>0)out.push({kind:'multa',id:car.id,sem:s,data:addD(s,Math.max(1,k.dias)),sinal:1,valor:k.multa,resta:k.restaMulta,cert:'incerta',titulo:car.nome+' · multa',nota:k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md),status:k.restaMulta<=0?'pago':(addD(s,4)<t?'atrasado':'pendente')})})});
+  if(k.multa>0)out.push({kind:'multa',id:car.id,sem:s,data:addD(s,Math.max(0,k.dias-1)),sinal:1,valor:k.multa,resta:k.restaMulta,cert:'incerta',titulo:car.nome+' · multa',nota:k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md),status:k.restaMulta<=0?'pago':(addD(s,4)<t?'atrasado':'pendente')})})});
  viv(S.rendas).forEach(function(r){if(!(r.valor>0))return;if(r.inicio&&r.inicio>ym)return;semanasDoMes(ym,r.diaSem==null?3:+r.diaSem).forEach(function(s){
   var rs=recebSemana('renda',r.id,s),rec=soma(rs,function(l){return l.valor});
   out.push(rs.length?{kind:'renda',id:r.id,sem:s,data:s,sinal:1,valor:rec,resta:0,cert:'certo',titulo:r.nome,status:'pago'}
@@ -564,19 +564,21 @@ function semanaInfo(car,W){
  var ci=_iso(c.inicio);if(ci&&ci>qui){var d2=diffD(ci,W)+1;if(d2<7)return ret({status:'cobrar',valor:Math.min(sem,d2*dia),nota:'1ª semana: '+d2+' diária'+(d2>1?'s':'')+' (contrato começou '+dsem(ci).slice(0,3)+' '+dbr(ci)+')'})}
  return ret({status:'cobrar',valor:sem})}
 /* ---------- a conta de cada semana: valor, multa de atraso, pagamentos (inteiros ou parciais) ----------
-   Vence na quarta (dia do pagamento). Sem o pagamento registrado, entra a multa do contrato por dia de atraso,
-   de quinta a domingo (no máximo 4 dias — cláusula 3.3). O que entra paga primeiro o semanal, depois a multa;
+   Vence na quarta às 12h. Passou do meio-dia sem pagamento = 1 dia de multa; cada meio-dia seguinte (quinta, sexta,
+   sábado, domingo) soma mais 1 — no máximo 5 dias, até domingo (cláusula 3.3). Regra do Hudson em 02/11/2026. O que entra paga primeiro o semanal, depois a multa;
    o que falta continua em aberto. Você pode mudar o valor da semana ou deixar de cobrar a multa. */
+function agoraMom(){if(window.__HOJE)return window.__HOJE+'T'+(window.__HORA||'23:59');var d=new Date();return iso(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())}
+function horaAgora(){if(window.__HOJE)return window.__HORA||'23:59';var d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
 function semAj(id,W){return (S.semanas||{})[id+'|'+W]||{}}
 function multaDiaCarro(car,inf){return (inf&&inf.multaDia)||car.multaDia||Math.ceil(((inf&&inf.contrato)||car.semanal||0)/700)*100}
 function contaSemana(car,W){
  var inf=semanaInfo(car,W);if(!inf)return null;var aj=semAj(car.id,W),t=hoje();
- var rs=recebSemana('carro',car.id,W).slice().sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:(a.criado||0)-(b.criado||0)});
+ var rs=recebSemana('carro',car.id,W).slice().sort(function(a,b){var x=a.data+(a.hora||''),y=b.data+(b.hora||'');return x<y?-1:x>y?1:(a.criado||0)-(b.criado||0)});
  var rec=soma(rs,function(l){return l.valor}),abat=soma(rs,function(l){return l.abat||0}),pago=rec+abat;
  var normal=inf.status==='cobrar'?inf.valor:0,devido=aj.valor!=null?aj.valor:normal;
  var md=multaDiaCarro(car,inf),cobra=devido>0&&car.cobraMulta!==false&&aj.multa!=='perdoar'&&W>=S.inicio+'-01';
- var acc=0,quitou=null;rs.forEach(function(l){acc+=l.valor+(l.abat||0);if(!quitou&&acc>=devido)quitou=l.data});
- var dias=Math.max(0,Math.min(4,diffD(W,quitou||t))),multa=cobra?dias*md:0;
+ var acc=0,quitou=null;rs.forEach(function(l){acc+=l.valor+(l.abat||0);if(!quitou&&acc>=devido)quitou=l.data+'T'+(l.hora||'00:00')});
+ var ref=quitou||agoraMom(),dias=0;for(var q=0;q<5;q++)if(addD(W,q)+'T12:00'<ref)dias++;var multa=cobra?dias*md:0;
  var restaSem=Math.max(0,devido-pago),restaMulta=Math.max(0,multa-Math.max(0,pago-devido));
  return {inf:inf,aj:aj,rs:rs,rec:rec,abat:abat,pago:pago,normal:normal,devido:devido,md:md,dias:dias,multa:multa,cobra:cobra,restaSem:restaSem,restaMulta:restaMulta,resta:restaSem+restaMulta,quitou:quitou}}
 
@@ -714,7 +716,7 @@ function pagarFixa(id,ym){var v=dinheiro('mPag',true);if(v==null)return;S.lanc.p
 /* carro e renda semanal */
 function abrirCarro(id){var c=id?carro(id):null,ab=c?paradaAberta(c):null;
  abrir('<h3>'+(c?esc(c.nome):'Novo carro')+'</h3>'+fTxt('rNome','Nome',c?c.nome:'','Ex.: Gol 2018')+fMoney('rSem','Semanal do contrato',c?c.semanal:null)+'<div class="two">'+fSel('rDs','Dia que paga',optDS(),c&&c.diaSem!=null?c.diaSem:3)+fTxt('rMot','Motorista',c?c.motorista:'','opcional')+'</div>'+
-  '<div class="two">'+fMoney('rMulta','Multa por dia de atraso',c?c.multaDia:null,(c&&usaGestao(c))?'Vem do contrato no Gestão. Só preencha para outro valor.':'Vazio = 1 diária (semanal ÷ 7).')+fSel('rCobra','Multa automática',[['1','Cobrar (de quinta a domingo)'],['0','Não cobrar']],c&&c.cobraMulta===false?'0':'1')+'</div>'+fSel('rInc','Essa entrada é',[['0','Provável (paga em dia)'],['1','Incerta (atrasa ou abate muito)']],c&&c.incerto?'1':'0','Incerta não entra no "pode gastar" até cair.')+(EXT.carros&&c&&c.gpk?fSel('rFonte','A semanal vem',[['gestao','Do contrato no Gestão (automático)'],['manual','Do valor digitado aqui']],c.fonte==='manual'?'manual':'gestao','Automático: tem contrato na semana = tem semanal. Sem contrato = sem semanal.'):'')+(EXT.carros?fSel('rGpk','Carro no Gestão',[['','Não ligar']].concat(Object.keys(EXT.carros).sort(function(x,y){return (EXT.carros[y].meuCarro?1:0)-(EXT.carros[x].meuCarro?1:0)||String(EXT.carros[x].nome).localeCompare(EXT.carros[y].nome)}).map(function(k){return [k,EXT.carros[k].nome+' · '+EXT.carros[k].placa+(EXT.carros[k].meuCarro?' (seu)':'')]})),c?c.gpk||'':'','Liga as manutenções do Gestão e os débitos do Multas a este carro.'):'')+
+  '<div class="two">'+fMoney('rMulta','Multa por dia de atraso',c?c.multaDia:null,(c&&usaGestao(c))?'Vem do contrato no Gestão. Só preencha para outro valor.':'Vazio = 1 diária (semanal ÷ 7).')+fSel('rCobra','Multa automática',[['1','Cobrar (quarta 12h até domingo)'],['0','Não cobrar']],c&&c.cobraMulta===false?'0':'1')+'</div>'+fSel('rInc','Essa entrada é',[['0','Provável (paga em dia)'],['1','Incerta (atrasa ou abate muito)']],c&&c.incerto?'1':'0','Incerta não entra no "pode gastar" até cair.')+(EXT.carros&&c&&c.gpk?fSel('rFonte','A semanal vem',[['gestao','Do contrato no Gestão (automático)'],['manual','Do valor digitado aqui']],c.fonte==='manual'?'manual':'gestao','Automático: tem contrato na semana = tem semanal. Sem contrato = sem semanal.'):'')+(EXT.carros?fSel('rGpk','Carro no Gestão',[['','Não ligar']].concat(Object.keys(EXT.carros).sort(function(x,y){return (EXT.carros[y].meuCarro?1:0)-(EXT.carros[x].meuCarro?1:0)||String(EXT.carros[x].nome).localeCompare(EXT.carros[y].nome)}).map(function(k){return [k,EXT.carros[k].nome+' · '+EXT.carros[k].placa+(EXT.carros[k].meuCarro?' (seu)':'')]})),c?c.gpk||'':'','Liga as manutenções do Gestão e os débitos do Multas a este carro.'):'')+
   (c&&usaGestao(c)?'<div class="alert ok"><i>🔗</i><div>Situação e semanal vêm do Gestão: contrato vigente = tem semanal; na oficina ou sem contrato = sem semanal.</div></div>':'')+'<div class="f" style="'+(c&&usaGestao(c)?'display:none':'')+'"><label>Situação</label><div class="chips"><button id="rSitR" class="'+(ab?'':'on')+'" onclick="sitCarro(0)">Rodando</button><button id="rSitP" class="'+(ab?'on':'')+'" onclick="sitCarro(1)">Parado</button></div></div>'+
   '<div id="rParadoBox" style="'+(ab?'':'display:none')+'">'+fData('rParIni','Parado desde',ab?ab.ini:hoje())+'</div>'+
   '<button class="btn" onclick="salvarCarro('+(c?"'"+c.id+"'":'null')+')">Salvar</button>'+(c?'<button class="btn red" onclick="excluirCarro(\''+c.id+'\')">Excluir carro</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
@@ -747,20 +749,20 @@ function abrirSemanaCarro(id,sem,lid){if(precisaConta())return;var car=carro(id)
  h+='<div class="card" style="margin-top:10px">'+
   '<div class="kv"><span>Semanal'+(k.aj.valor!=null?' (ajustado por você)':'')+'</span><b>'+c2s(k.devido)+'</b></div>'+(inf.nota&&k.aj.valor==null?'<div class="sub" style="margin:-2px 0 6px">'+esc(inf.nota)+'</div>':'')+
   (k.multa>0||k.aj.multa==='perdoar'?'<div class="kv"><span>Multa de atraso'+(k.multa>0?' · '+k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md):'')+'</span><b class="'+(k.multa>0?'warnc':'')+'">'+(k.multa>0?c2s(k.multa):'não cobrada')+'</b></div>':'')+
-  (k.rs.length?k.rs.map(function(l){return '<div class="row tap" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',\''+l.id+'\')"><div class="bub in">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+' · '+esc(nomeMeio(l))+(l.motivo?' · '+esc(l.motivo):'')+'</div></div><div class="v sub">editar ›</div></div>'}).join(''):'')+
+  (k.rs.length?k.rs.map(function(l){return '<div class="row tap" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',\''+l.id+'\')"><div class="bub in">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+' · '+esc(nomeMeio(l))+(l.motivo?' · '+esc(l.motivo):'')+'</div></div><div class="v sub">editar ›</div></div>'}).join(''):'')+
   '<div class="hr"></div><div class="kv"><span><b style="color:var(--tx)">'+(k.resta>0?'Falta receber':'Tudo pago')+'</b></span><b class="'+(k.resta>0?'neg':'pos')+'" style="font-size:17px">'+c2s(k.resta)+'</b></div></div>';
- if(k.devido>0&&k.cobra&&k.multa===0&&k.resta>0&&hoje()<=sem)h+='<div class="sub" style="margin:0 0 8px">Se não for pago até '+dsem(sem)+' '+dbr(sem)+', entra multa de '+c2s(k.md)+' por dia (até domingo).</div>';
+ if(k.devido>0&&k.cobra&&k.multa===0&&k.resta>0&&agoraMom()<=sem+'T12:00')h+='<div class="sub" style="margin:0 0 8px">Se não for pago até '+dsem(sem)+' '+dbr(sem)+' às 12h, entra multa de '+c2s(k.md)+' por dia (de quarta 12h até domingo).</div>';
  var sug=ed?ed.valor:k.resta,fechado=k.resta<=0&&!ed;
  if(fechado)h+='<button class="btn sec" id="sMaisBt" onclick="this.style.display=\'none\';document.getElementById(\'sForm\').style.display=\'\'">＋ Registrar outro pagamento</button>';
  h+='<div id="sForm" style="'+(fechado?'display:none':'')+'">';
  h+='<h2 style="margin-top:6px">'+(ed?'Editar pagamento':(k.rs.length?'Registrar outro pagamento':'Registrar pagamento'))+'</h2>'+fMoney('sVal','Quanto entrou',sug,k.rs.length||ed?'':'Pode ser só uma parte: o que faltar continua em aberto.')+
   fMoney('sAb','Abatido por manutenção',ed?ed.abat:null,'Manutenção que o motorista pagou e descontou. Fica anotada no carro e não vira despesa sua de novo.')+fTxt('sMot','Motivo (opcional)',ed?ed.motivo:'','Ex.: troca de pastilha')+
-  '<div class="two">'+fSel('sConta','Caiu na conta',optContas(),ed?ed.meio:'')+fData('sData','Data que caiu',ed?ed.data:(sem<hoje()?hoje():(sem>hoje()?hoje():sem)))+'</div>'+
+  fSel('sConta','Caiu na conta',optContas(),ed?ed.meio:'')+'<div class="two">'+fData('sData','Data que caiu',ed?ed.data:hoje())+'<div class="f"><label>Hora</label><input type="time" id="sHora" value="'+esc(ed?(ed.hora||''):horaAgora())+'"></div></div><small class="sub" style="display:block;margin:-4px 2px 10px">A hora decide a multa: depois das 12h de cada dia (a partir de quarta) conta mais 1 dia.</small>'+
   '<button class="btn" onclick="salvarPagSemana(\''+id+'\',\''+sem+'\','+(ed?"'"+ed.id+"'":'null')+')">'+(ed?'Salvar alteração':'Registrar')+'</button>'+(ed?'<button class="btn red" onclick="desfazer(\''+ed.id+'\')">Apagar este pagamento</button>':'')+'</div>';
  h+='<div class="chips" style="margin:10px 0 4px;flex-wrap:wrap">'+(k.multa>0||k.aj.multa==='perdoar'?'<button onclick="multaSemana(\''+id+'\',\''+sem+'\',\''+(k.aj.multa==='perdoar'?'cobrar':'perdoar')+'\')">'+(k.aj.multa==='perdoar'?'Voltar a cobrar a multa':'Não cobrar a multa')+'</button>':'')+'<button onclick="ajusteSemana(\''+id+'\',\''+sem+'\')">Mudar o valor desta semana</button></div>';
  abrir(h+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
 function salvarPagSemana(id,sem,lid){var v=dinheiro('sVal',false),ab=parseBRL(val('sAb'))||0;if(v==null)v=0;if(v<0||ab<0){toast('Valor não pode ser negativo');return}if(v===0&&ab===0){toast('Informe quanto entrou ou quanto foi abatido');return}
- var p={valor:v,abat:ab,motivo:val('sMot').trim(),meio:val('sConta'),data:val('sData')||hoje()};var l=lid?porId(S.lanc,lid):null;
+ var p={valor:v,abat:ab,motivo:val('sMot').trim(),meio:val('sConta'),data:val('sData')||hoje(),hora:val('sHora')||''};var l=lid?porId(S.lanc,lid):null;
  if(l)editar(l,p);else S.lanc.push(Object.assign({id:uid(),tipo:'entrada',fonte:'carro',fid:id,semana:sem,criado:Date.now(),at:Date.now()},p));
  save();var k=contaSemana(carro(id),sem);fechar();render();toast(k&&k.resta>0?'Salvo · ainda falta '+c2s(k.resta):'Salvo · semana paga')}
 function multaSemana(id,sem,modo){var key=id+'|'+sem,o=S.semanas[key]||{};o=Object.assign({},o,{multa:modo==='perdoar'?'perdoar':null,at:Date.now()});if(!o.multa)delete o.multa;S.semanas[key]=o;save();render();abrirSemanaCarro(id,sem);toast(modo==='perdoar'?'Multa desta semana não será cobrada':'Multa volta a ser cobrada')}
