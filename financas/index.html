@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=11, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=12, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -714,7 +714,7 @@ function extManut(car,ym){var out={mes:[]};if(!car||!car.gpk||!EXT.manut)return 
   var b0=(m.blocos||[])[0]||{},tit=(b0.servicos&&b0.servicos[0])||String(m.texto||'').split('\n')[0]||((m.pecas||[])[0]||{}).desc||'Manutenção';
   var d=_iso(m.dataFim)||_iso(m.dataIni);if(!d||ymOf(d)!==ym)return;
   out.mes.push({id:id,tot:v,sua:Math.round(v*(100-dv)/100),dv:dv,data:d,titulo:tit,oficina:b0.nome||''})});
- out.mes.sort(function(a,b){return a.data<b.data?-1:1});return out}
+ out.mes.sort(function(a,b){return a.data<b.data?1:-1});return out}
 /* Débitos e multas do app Multas (Hudson 03/11): o que está em aberto NÃO é despesa do mês — só aparece como aviso no carro.
    Quando você marca "pago" lá no Multas, entra aqui sozinho como despesa do carro, no mês em que pagou. */
 function _nomeDeb(d){return (({ipva:'IPVA',grt:'GRT',vistoria:'Vistoria',reteste:'Reteste',licenciamento:'Licenciamento'})[d.tipo]||String(d.tipo||'Débito').toUpperCase())+(d.ano?' '+d.ano:'')}
@@ -848,7 +848,7 @@ function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
   '<button class="btn" onclick="salvarFatura(\''+cid+'\',\''+ym+'\')">Salvar valores</button>',x.informado?'Corrigir o valor da fatura':'Digitar o valor que o banco cobra');
  h+='<div class="card"><div class="kv"><span>Total</span><b>'+c2s(x.valor)+'</b></div><div class="kv"><span>Sua parte</span><b>'+c2s(x.sua)+'</b></div><div class="kv"><span>Pago</span><b>'+c2s(x.pago)+'</b></div><div class="kv"><span>Falta pagar</span><b class="'+(x.resta?'neg':'')+'">'+c2s(x.resta)+'</b></div>'+(x.pai?'<div class="kv"><span>Reembolso do pai recebido</span><b>'+c2s(x.reemb)+' de '+c2s(x.pai)+'</b></div>':'')+(x.informado?'<div class="kv"><span>Não identificado</span><b class="warnc">'+c2s(x.naoId)+'</b></div>':'')+'</div>';
  x.pags.forEach(function(l){h+='<div class="row"><div class="g"><div class="t">Pago '+c2s(l.valor)+'</div><div class="s">'+dlab(l.data)+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm red" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'});
- h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.forEach(function(i){h+='<div class="row tap" onclick="'+(i.kind==='lanc'?"abrirLanc('"+i.l.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="g"><div class="t">'+esc(i.nome)+(i.pai?' <span class="pill inf">pai</span>':'')+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+dlab(i.data)+(i.kind==='fixa'?' · conta fixa':'')+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'});
+ h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.slice().sort(function(a,b){var da=a.data||'',db=b.data||'';if(da!==db)return da<db?1:-1;return ((b.l&&b.l.criado)||0)-((a.l&&a.l.criado)||0)}).forEach(function(i){h+='<div class="row tap" onclick="'+(i.kind==='lanc'?"abrirLanc('"+i.l.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="g"><div class="t">'+esc(i.nome)+(i.pai?' <span class="pill inf">pai</span>':'')+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+dlab(i.data)+(i.kind==='fixa'?' · conta fixa':'')+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'});
  if(!x.its.length)h+='<div class="empty">Nenhuma compra lançada neste cartão para esta fatura.</div>';
  abrir(h+'</div><button class="btn sec" onclick="abrirCartao(\''+cid+'\')">Dias de fechamento e vencimento</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
 function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco')),p=parseBRL(val('fPai')),f=S.faturas[k]||(S.faturas[k]={});editar(f,{banco:b,pai:p});save();abrirFatura(cid,ym);render();toast('Fatura atualizada')}
