@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=16, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=17, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -638,8 +638,11 @@ function vMais(){var h='';
  h+='<button class="btn sm sec" onclick="abrirConta()">+ Conta</button><button class="btn sm sec" onclick="novaTransf()">Transferir entre contas</button></div>';
  h+='<div class="card tap" onclick="abrirConexao()"><h2>Gestão e Multas</h2><div style="display:flex;gap:11px;align-items:center"><div class="bub">🔗</div><div class="g"><div class="t" style="font-size:15.5px">'+(extChave()?'Conectado (só leitura)':'Não conectado')+'</div><div class="s sub">'+(extChave()?(EXT.em?'atualizado '+new Date(EXT.em).toLocaleString('pt-BR'):'aguardando a primeira leitura')+(EXT_ERRO?' · '+esc(EXT_ERRO):''):'Manutenções, documentos e multas dos seus carros')+'</div></div></div></div>';
  h+='<div class="card"><h2>Contas fixas</h2>';var fx=viv(S.fixas).slice().sort(function(a,b){return (a.dia||99)-(b.dia||99)});
- fx.forEach(function(f){h+='<div class="row tap" onclick="abrirFixa(\''+f.id+'\')"><div class="bub out">'+icone({kind:'fixa',id:f.id,titulo:f.nome,sinal:-1})+'</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">'+(f.dia?'dia '+f.dia:'dia a confirmar')+' · '+(ehCartao(f.meio)?'no cartão '+esc(cartao(f.meio).nome):'boleto/débito')+(f.fim?' · até '+mesNome(f.fim):'')+'</div></div><div class="v">'+c2s(f.valor)+'</div></div>'});
- if(!fx.length)h+='<div class="empty">Nenhuma.</div>';h+='<button class="btn sm sec" onclick="abrirFixa()">+ Conta fixa</button></div>';
+ fx.forEach(function(f){var acabou=!fixaVigente(f,ymOf(hoje()))&&!(f.inicio&&f.inicio>ymOf(hoje()));h+='<div class="row tap'+(acabou?' muted':'')+'" onclick="abrirFixa(\''+f.id+'\')"><div class="bub out">'+icone({kind:'fixa',id:f.id,titulo:f.nome,sinal:-1})+'</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">'+(f.dia?'dia '+f.dia:'dia a confirmar')+' · '+(ehCartao(f.meio)?'no cartão '+esc(cartao(f.meio).nome):'boleto/débito')+(acabou?' · terminou':f.fim?' · até '+mesNome(f.fim):'')+'</div></div><div class="v">'+c2s(f.valor)+'</div></div>'});
+ if(!fx.length)h+='<div class="empty">Nenhuma.</div>';
+ else{var ymA=ymOf(hoje()),vig=fx.filter(function(f){return fixaVigente(f,ymA)}),tCart=soma(vig.filter(function(f){return ehCartao(f.meio)}),function(f){return valorFixa(f,ymA)}),tBol=soma(vig.filter(function(f){return !ehCartao(f.meio)}),function(f){return valorFixa(f,ymA)});
+  h+='<div class="hr"></div><div class="kv"><span><b style="color:var(--tx)">Total por mês</b></span><b style="font-size:17px">'+c2s(tCart+tBol)+'</b></div><div class="kv sub"><span>boleto / débito</span><span>'+c2s(tBol)+'</span></div><div class="kv sub"><span>no cartão (já dentro das faturas)</span><span>'+c2s(tCart)+'</span></div>'}
+ h+='<button class="btn sm sec" onclick="abrirFixa()">+ Conta fixa</button></div>';
  h+='<div class="card"><h2>Contas avulsas (uma vez só)</h2>';viv(S.avulsas).slice().sort(function(a,b){return a.data<b.data?-1:1}).forEach(function(a){h+='<div class="row tap" onclick="abrirAvulsa(\''+a.id+'\')"><div class="bub '+(a.receber?'in':'out')+'">'+(a.receber?'📥':'📌')+'</div><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+(a.receber?'a receber':'a pagar')+' · '+dlab(a.data)+'</div></div><div class="v '+(a.receber?'pos':'')+'">'+c2s(a.valor)+'</div></div>'});
  h+='<button class="btn sm sec" onclick="abrirAvulsa()">+ Conta avulsa</button></div>';
  h+='<div class="card"><h2>Lançamentos</h2>'+mnav('ML');var ls=viv(S.lanc).filter(function(l){return ymOf(l.data)===ML}).sort(function(a,b){return a.data<b.data?1:-1});
