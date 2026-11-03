@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=21, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=22, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -312,13 +312,13 @@ function itensMes(ym){
   out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,semData:x.semData,sinal:-1,valor:x.valor,resta:x.resta,cert:'certo',titulo:f.nome,status:x.resta<=0?'pago':(atras(x.due)?'atrasado':'pendente')})});
  viv(S.cartoes).forEach(function(c){var x=fatura(c.id,ym);if(x.valor<=0&&!x.informado)return;
   out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor,resta:x.resta,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:x.resta<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:x.pai});
-  if(x.pai>0)out.push({kind:'reemb',id:c.id,ym:ym,data:x.vence,sinal:1,valor:x.pai,resta:x.paiPend,cert:'incerta',titulo:'Reembolso do seu pai ('+c.nome+')',status:x.paiPend<=0?'pago':'pendente'})});
+  if(x.pai>0)out.push({kind:'reemb',id:c.id,ym:ym,data:x.vence,sinal:1,valor:x.pai,resta:x.paiPend,cert:'provavel',titulo:'Reembolso do seu pai ('+c.nome+')',status:x.paiPend<=0?'pago':'pendente'})});
  viv(S.carros).forEach(function(car){var ug=usaGestao(car);if(!ug&&!(car.semanal>0))return;semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){
   var ex=excluidoEm(car);if(ex&&s>=ex&&!recebSemana('carro',car.id,s).length)return;
   var k=contaSemana(car,s);if(!k)return;var inf=k.inf;
   var base={kind:'carro',id:car.id,sem:s,data:s,sinal:1,contrato:inf.contrato||inf.valor,titulo:car.nome,nota:(k.aj.valor!=null?'valor desta semana ajustado por você':inf.nota)||'',motorista:inf.motorista||'',devido:k.devido,pagoParc:k.pago,multaInfo:k};
   if(k.adiada){out.push(Object.assign(base,{valor:k.devido+k.carry,resta:0,cert:'certo',status:'adiado',nota:'não pagou · passou para '+dbr(k.adiada).slice(0,5)}));return}
-  if(k.carry){base.nota=(base.nota?base.nota+' · ':'')+'inclui '+c2s(k.carry)+' de '+k.carryL.length+' semana'+(k.carryL.length>1?'s':'')+' anterior'+(k.carryL.length>1?'es':'')}
+  if(k.carry){var nC=Math.max(k.carryL.length,cadeiaSemana(car,s).filter(function(c){return c.W!==s}).length);base.nota=(base.nota?base.nota+' · ':'')+'inclui '+c2s(k.carry)+' de '+nC+' semana'+(nC>1?'s':'')+' anterior'+(nC>1?'es':'')}
   if(k.devido<=0&&!k.rs.length&&!k.carry){out.push(Object.assign(base,inf.status==='adiantado'?{valor:0,resta:0,cert:'certo',status:'adiantado'}:{valor:0,resta:0,cert:'certo',status:'parado',semContrato:inf.status==='semContrato'}));return}
   if(k.restaSem+k.carry<=0)out.push(Object.assign(base,{valor:Math.min(k.rec,Math.max(0,k.devido-k.abat))||k.rec,resta:0,cert:'certo',status:'pago'}));
   else out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:certCarro(car,inf,s),status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}));
@@ -352,7 +352,11 @@ function resumoMes(ym){var it=itensMes(ym),r={pagar:0,seguro:0,incerto:0,reembRe
   if(x.status==='pago'||x.status==='feito'){r.seguro+=x.valor;return}
   if(x.status==='atrasado'){if(x.multaInfo&&x.multaInfo.rec)r.seguro+=x.multaInfo.rec;return}
   if(x.cert==='incerta')r.incerto+=x.valor;else r.seguro+=x.valor});
- r.falta=r.seguro+r.reembRec-r.pagar;r.seTudo=r.falta+r.incerto+r.reembPrev;return r}
+ r.falta=r.seguro+r.reembRec+r.reembPrev-r.pagar;r.seTudo=r.falta+r.incerto;return r}
+/* Hudson 03/11: o que é do pai na fatura não é gasto seu; o reembolso dele não é renda. Sua parte de uma despesa: */
+function suaV(x){return x.kind==='fatura'&&x.pai>0?Math.max(0,x.valor-x.pai):x.valor}
+function suaR(x){var r=x.resta||0;return x.kind==='fatura'&&x.pai>0&&x.valor>0?Math.round(r*suaV(x)/x.valor):r}
+function paiNasFaturas(xs){return soma(xs.filter(function(x){return x.kind==='fatura'}),function(x){return x.pai||0})}
 
 /* ---------- projeção dos próximos dias ---------- */
 /* ---------- projeção: saldo dia a dia, e depois de cada conta ---------- */
@@ -431,6 +435,7 @@ function linhaItem(x,proj,dep){
  if(x.kind==='carro'&&x.status==='pago'&&x.contrato&&x.valor!==x.contrato)sub.push('contrato '+c2s(x.contrato));
  if((x.kind==='carro'||x.kind==='multa')&&x.nota&&x.status!=='pago')sub.push(x.nota);
  if(proj&&x.resta!==x.valor&&x.status!=='parado')sub.push('de '+c2s(x.valor));
+ if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte '+c2s(suaV(x))+' · seu pai '+c2s(x.pai));
  var muted=(x.status==='pago'||x.status==='parado'||x.status==='cartao')&&!proj?' muted':'';
  var pl=pillStatus(x,proj),aft='';
  if(dep&&x.sinal<0&&saldoTotal()!=null)aft='<small class="'+(dep.saldo<0?'neg':'')+'">'+(dep.saldo<0?'faltam '+c2s(-dep.saldo):'sobra '+c2s(dep.saldo))+'</small>';
@@ -510,7 +515,7 @@ function blocoPagar7(p,velhas){var t=hoje(),lim=addD(t,7),os=p.outs.filter(funct
 function visaoMes(){var ym=ymOf(hoje()),it=itensMes(ym);
  var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)});
  var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===ym&&((l.tipo==='entrada'&&!ehVendaL(l))||l.tipo==='recavulsa')}),function(l){return l.valor}),prevE=rec+soma(ent,function(x){return x.resta||0});
- var ds=it.filter(function(x){return x.sinal<0}),totD=soma(ds,function(x){return x.valor}),pagoD=totD-soma(ds,function(x){return x.resta||0});
+ var ds=it.filter(function(x){return x.sinal<0}),totD=soma(ds,suaV),pagoD=totD-soma(ds,suaR);
  var cs=viv(S.cartoes),fat=soma(cs,function(c){return fatura(c.id,ym).resta}),Ls=cs.map(limiteCartao).filter(Boolean),disp=soma(Ls,function(L){return L.disp});
  return '<div class="vm"><div class="vmt tap" onclick="AG=\'entradas\';go(\'agenda\')"><span class="ic in">↓</span><small>Entradas · '+MESES[+ym.slice(5,7)-1].slice(0,3)+'</small><b class="pos">'+c2s(rec)+'</b><em>previsto '+c2s(prevE)+'</em></div>'+
   '<div class="vmt tap" onclick="AG=\'despesas\';go(\'agenda\')"><span class="ic out">↑</span><small>Despesas · '+MESES[+ym.slice(5,7)-1].slice(0,3)+'</small><b>'+c2s(pagoD)+'</b><em>previsto '+c2s(totD)+'</em></div>'+
@@ -559,8 +564,8 @@ function catsFatura(cid,ym){var x=fatura(cid,ym),c={},paiIt=0;x.its.forEach(func
  return {c:c,pai:Math.max(x.pai,paiIt),valor:x.valor,paiSemMarcar:x.pai>paiIt+100}}
 function vResumo(){var it=itensMes(M);
  var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)}),entT=soma(ent,function(x){return x.valor});
- var ds=it.filter(function(x){return x.sinal<0}),saiT=soma(ds,function(x){return x.valor}),sob=entT-saiT;
- var h='<div class="card"><div class="tri"><div><span>Entra</span><b class="pos">'+c2s(entT)+'</b></div><div><span>Sai</span><b>'+c2s(saiT)+'</b></div><div><span>'+(sob<0?'Falta':'Sobra')+'</span><b class="'+(sob<0?'neg':'pos')+'">'+c2s(Math.abs(sob))+'</b></div></div><div class="sub" style="margin-top:6px">Previsto do mês inteiro (já recebido + a receber; já pago + a pagar). Sem reembolso, empréstimo e venda.</div></div>';
+ var ds=it.filter(function(x){return x.sinal<0}),saiT=soma(ds,suaV),sob=entT-saiT,paiF=paiNasFaturas(ds);
+ var h='<div class="card"><div class="tri"><div><span>Entra</span><b class="pos">'+c2s(entT)+'</b></div><div><span>Sai</span><b>'+c2s(saiT)+'</b></div><div><span>'+(sob<0?'Falta':'Sobra')+'</span><b class="'+(sob<0?'neg':'pos')+'">'+c2s(Math.abs(sob))+'</b></div></div><div class="sub" style="margin-top:6px">Previsto do mês inteiro (já recebido + a receber; já pago + a pagar). Só o que é seu: sem a parte do seu pai nas faturas'+(paiF?' ('+c2s(paiF)+')':'')+', sem o reembolso dele, empréstimo e venda.</div></div>';
  var cm=catsMes(M),tc=soma(Object.keys(cm.c),function(k){return cm.c[k]});
  var semMarcar=viv(S.cartoes).some(function(c){return catsFatura(c.id,M).paiSemMarcar});
  if(tc)h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+barrasCat(cm.c,tc,8)+(cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas</span><b>'+c2s(cm.pai)+'</b></div>':'')+(semMarcar?'<div class="sub" style="margin-top:4px">Inclui compras do seu pai que ainda não foram marcadas como dele.</div>':'')+'</div>';
@@ -573,8 +578,8 @@ function vResumo(){var it=itensMes(M);
  return h}
 function vDespesas(){var it=itensMes(M),t=hoje();
  var ds=it.filter(function(x){return x.sinal<0});
- var tot=soma(ds,function(x){return x.valor}),falta=soma(ds,function(x){return x.resta||0}),pago=tot-falta;
- var h='<div class="card"><div class="tri"><div><span>Pago</span><b>'+c2s(pago)+'</b></div><div><span>Falta pagar</span><b class="'+(falta?'neg':'')+'">'+c2s(falta)+'</b></div><div><span>Total do mês</span><b>'+c2s(tot)+'</b></div></div><div class="sub" style="margin-top:6px">Fatura de cartão conta inteira no mês em que vence. Compras no cartão não entram de novo.</div></div>';
+ var tot=soma(ds,suaV),falta=soma(ds,suaR),pago=tot-falta,paiF=paiNasFaturas(ds);
+ var h='<div class="card"><div class="tri"><div><span>Pago</span><b>'+c2s(pago)+'</b></div><div><span>Falta pagar</span><b class="'+(falta?'neg':'')+'">'+c2s(falta)+'</b></div><div><span>Seu gasto no mês</span><b>'+c2s(tot)+'</b></div></div><div class="sub" style="margin-top:6px">'+(paiF?'Sem a parte do seu pai nas faturas ('+c2s(paiF)+'): você paga no cartão e ele devolve, não é gasto seu. ':'')+'Compras no cartão não entram de novo.</div></div>';
  var cm=catsMes(M),ks=Object.keys(cm.c).sort(function(a,b){return cm.c[b]-cm.c[a]}),tc=soma(ks,function(k){return cm.c[k]});
  if(ks.length){h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+ks.map(function(k){var v=cm.c[k],pc=tc?v/tc*100:0;return '<div class="catr"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+
   (cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas (ele devolve)</span><b>'+c2s(cm.pai)+'</b></div>':'')+(cm.c['A classificar']?'<div class="sub" style="margin-top:6px">"A classificar": compras que vieram da fatura sem categoria. Toque na compra (em Cartões) para escolher.</div>':'')+'</div>'}
@@ -583,11 +588,11 @@ function vDespesas(){var it=itensMes(M),t=hoje();
  return h}
 function vAgenda(){if(AG==='entradas')return mnav()+segAg()+vEntradas();if(AG==='resumo')return mnav()+segAg()+vResumo();if(AG==='despesas')return mnav()+segAg()+vDespesas();
  var r=resumoMes(M),it=itensMes(M),h=mnav(),t=hoje(),ult=addD(addM(M,1)+'-01',-1),p=projecaoAte(ult<t?t:ult),sal=p.saldo;h+=segAg();
- h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><div><div class="sub">Para pagar no mês</div><div class="big neg">'+c2s(r.pagar)+'</div></div><div style="text-align:right"><div class="sub">'+(r.falta<0?'Falta':'Sobra')+' com o seguro</div><div class="mid '+(r.falta<0?'neg':'pos')+'">'+c2s(Math.abs(r.falta))+'</div></div></div>';
- var tot=Math.max(1,r.pagar,r.seguro+r.incerto+r.reembPrev+r.reembRec);
- h+='<div class="bar"><i style="width:'+(r.seguro/tot*100)+'%;background:var(--grn)"></i><i style="width:'+((r.incerto+r.reembPrev)/tot*100)+'%;background:var(--yel)"></i><i style="width:'+(r.reembRec/tot*100)+'%;background:var(--blue)"></i></div><div class="bar"><i style="width:'+(r.pagar/tot*100)+'%;background:var(--red)"></i></div>';
- h+='<div class="legend"><span style="--c:var(--grn)">entra com segurança '+c2s(r.seguro)+'</span><span style="--c:var(--yel)">incerto '+c2s(r.incerto+r.reembPrev)+'</span>'+(r.reembRec?'<span style="--c:var(--blue)">reembolso recebido '+c2s(r.reembRec)+'</span>':'')+'<span style="--c:var(--red)">sai '+c2s(r.pagar)+'</span></div>';
- h+='<div class="sub" style="margin-top:8px">Se tudo o que é incerto entrar (inclusive o reembolso do seu pai): <b class="'+(r.seTudo<0?'neg':'pos')+'">'+(r.seTudo<0?'faltam ':'sobram ')+c2s(Math.abs(r.seTudo))+'</b>'+(r.emprest?' · empréstimo no mês (não é renda): '+c2s(r.emprest):'')+'</div></div>';
+ h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><div><div class="sub">Para pagar no mês</div><div class="big neg">'+c2s(r.pagar)+'</div></div><div style="text-align:right"><div class="sub">'+(r.falta<0?'Sai mais do que entra':'Entra mais do que sai')+'</div><div class="mid '+(r.falta<0?'neg':'pos')+'">'+c2s(Math.abs(r.falta))+'</div></div></div>';
+ var tot=Math.max(1,r.pagar,r.seguro+r.incerto+r.reembPrev+r.reembRec),rb=r.reembPrev+r.reembRec;
+ h+='<div class="bar"><i style="width:'+(r.seguro/tot*100)+'%;background:var(--grn)"></i><i style="width:'+(rb/tot*100)+'%;background:var(--blue)"></i><i style="width:'+(r.incerto/tot*100)+'%;background:var(--yel)"></i></div><div class="bar"><i style="width:'+(r.pagar/tot*100)+'%;background:var(--red)"></i></div>';
+ h+='<div class="legend"><span style="--c:var(--grn)">entra com segurança '+c2s(r.seguro)+'</span>'+(rb?'<span style="--c:var(--blue)">seu pai devolve '+c2s(rb)+' (não é renda)</span>':'')+(r.incerto?'<span style="--c:var(--yel)">incerto '+c2s(r.incerto)+'</span>':'')+'<span style="--c:var(--red)">sai '+c2s(r.pagar)+'</span></div>';
+ h+=(r.incerto||r.emprest?'<div class="sub" style="margin-top:8px">'+(r.incerto?'Se o incerto entrar: <b class="'+(r.seTudo<0?'neg':'pos')+'">'+(r.seTudo<0?'faltam ':'sobram ')+c2s(Math.abs(r.seTudo))+'</b>':'')+(r.emprest?(r.incerto?' · ':'')+'empréstimo no mês (não é renda): '+c2s(r.emprest):'')+'</div>':'')+'</div>';
  if(sal==null){var cs=viv(S.contas);h+='<div class="hero"><div class="lb">Saldo de hoje</div><div class="det">Informe o saldo para a agenda mostrar quanto sobra ou falta depois de cada conta.</div>'+(cs.length===1?'<input id="hSaldo" inputmode="decimal" placeholder="R$ 0,00"><button class="hbtn" onclick="salvarSaldoRapido(\''+cs[0].id+'\')">Salvar saldo de hoje</button>':'<button class="hbtn" onclick="go(\'mais\')">Informar</button>')+'</div>'}
  else if(M>=ymOf(t))h+='<div class="card tap" onclick="abrirSaldo()" style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px"><span class="sub">Dinheiro hoje ('+dcurto(t)+')</span><b class="mid">'+c2s(sal)+'</b></div>';
  if(!it.length)return h+'<div class="card"><div class="empty">Nada neste mês.</div></div>';
