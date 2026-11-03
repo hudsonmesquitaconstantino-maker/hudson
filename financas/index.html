@@ -582,7 +582,7 @@ function abrirDetCarro(id){var car=carro(id),k=contaCarro(car,M),si=situacaoCarr
   (k.manSua?'<div class="kv"><span>Manutenção, sua parte'+(k.abat?' (menos o já abatido)':'')+'</span><b class="neg">'+c2s(k.manConsid)+'</b></div>':'')+
   '<div class="hr"></div><div class="kv"><span><b style="color:var(--tx)">Resultado do mês</b></span><b class="'+(k.res<0?'neg':'pos')+'" style="font-size:17px">'+c2s(k.res)+'</b></div></div>';
  if(g){h+='<div class="card"><h2>🔧 Manutenções em '+mesNome(M)+'</h2>'+(k.man.length?k.man.map(function(m){return '<div class="row"><div class="g"><div class="t">'+esc(m.titulo)+'</div><div class="s">'+dlab(m.data)+(m.oficina?' · '+esc(m.oficina):'')+(m.dv?' · motorista pagou '+m.dv+'%':'')+'</div></div><div class="v">'+c2s(m.sua)+(m.sua!==m.tot?'<small>de '+c2s(m.tot)+'</small>':'')+'</div></div>'}).join(''):'<div class="empty">Nenhuma neste mês.</div>')+'</div>';
-  if(dc)h+='<div class="card"><h2>📄 Em aberto no Multas</h2><div class="sub" style="margin:-4px 0 6px">Não entra na conta do mês. Quando você marcar pago no app Multas, entra aqui sozinho.</div>'+(dc.itens.length?dc.itens.map(function(d){return '<div class="row"><div class="g"><div class="t">'+esc(d.nome)+'</div><div class="s">'+(d.venc?'vence '+dlab(d.venc):'sem vencimento')+(d.obs?' · '+esc(d.obs):'')+'</div></div><div class="v '+(d.valor!=null?'':'muted')+'">'+(d.valor!=null?c2s(d.valor):'valor ?')+'</div></div>'}).join('')+'<div class="kv" style="margin-top:4px"><span>Total em aberto</span><b>'+c2s(dc.pend)+'</b></div>':'<div class="empty">Nada em aberto.</div>')+'</div>'}
+  if(dc)h+='<div class="card"><h2>📄 Em aberto no Multas</h2><div class="sub" style="margin:-4px 0 6px">Só para consulta: nada do app Multas entra nas contas. Quando pagar, lance o gasto aqui (categoria Multas e débitos).</div>'+(dc.itens.length?dc.itens.map(function(d){return '<div class="row"><div class="g"><div class="t">'+esc(d.nome)+'</div><div class="s">'+(d.venc?'vence '+dlab(d.venc):'sem vencimento')+(d.obs?' · '+esc(d.obs):'')+'</div></div><div class="v '+(d.valor!=null?'':'muted')+'">'+(d.valor!=null?c2s(d.valor):'valor ?')+'</div></div>'}).join('')+'<div class="kv" style="margin-top:4px"><span>Total em aberto</span><b>'+c2s(dc.pend)+'</b></div>':'<div class="empty">Nada em aberto.</div>')+'</div>'}
  abrir(h+'<button class="btn sec" onclick="abrirCarro(\''+id+'\')">Editar o carro</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
 function acaoSemanal(){var cs=carrosAtivos();var t=hoje(),cand=[];
  cs.forEach(function(c){[addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<S.inicio)return;itensMes(ym).forEach(function(x){if(x.kind==='carro'&&x.id===c.id&&x.resta>0&&(x.status==='pendente'||x.status==='atrasado')&&x.data<=addD(t,6))cand.push(x)})})});
@@ -682,7 +682,9 @@ function extDocs(car){if(!car||!car.gpk||!EXT.multas)return null;var v=EXT.multa
  (v.debitos||[]).forEach(function(d){if(!d)return;var o={nome:_nomeDeb(d),valor:d.valor==null?null:Math.round(Number(d.valor)*100),venc:_iso(d.venc),obs:d.obs||''};if(d.pagoEm){o.pago=_iso(d.pagoEm);pg.push(o)}else it.push(o)});
  (v.multas||[]).forEach(function(m){if(!m)return;var o={nome:'Multa'+(m.data?' de '+dbr(_iso(m.data)):''),valor:m.valor==null?null:Math.round(Number(m.valor)*100),venc:'',obs:m.obs||''};if(m.pagaEm){o.pago=_iso(m.pagaEm);pg.push(o)}else it.push(o)});
  return {itens:it,pend:soma(it,function(d){return d.valor||0}),pagos:pg}}
-function docsPagosMes(car,ym){var d=extDocs(car);if(!d)return [];return d.pagos.filter(function(o){return o.pago&&ymOf(o.pago)===ym&&o.valor>0&&o.pago>=S.inicio+'-01'})}
+/* Hudson 03/11 (2ª mensagem): o app Multas é só para organizar os débitos dos carros. Nada de lá entra sozinho nas contas —
+   nem em aberto, nem pago. Quando pagar, você lança aqui à mão (categoria "Multas e débitos"). */
+function docsPagosMes(car,ym){return []}
 function loadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('sem internet'))};document.head.appendChild(s)})}
 var _fbPronto=null;
 function fb(){if(_fbPronto)return _fbPronto;var b='https://www.gstatic.com/firebasejs/9.23.0/';
@@ -971,6 +973,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};
  (d.faturas||[]).forEach(function(o){var f=S.faturas[o.k]||(S.faturas[o.k]={});if('banco' in o)editar(f,{banco:o.banco});if('pai' in o)editar(f,{pai:o.pai})});
  (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;editar(l,pt);return}S.lanc.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.lanc++});
  (d.fixas||[]).forEach(function(o){var re=new RegExp(o.nome,'i');viv(S.fixas).forEach(function(f){if(re.test(f.nome)){editar(f,o.patch);n.fix++}})});
+ (d.recat||[]).forEach(function(o){var re=new RegExp(o.desc,'i');viv(S.lanc).forEach(function(l){if(l.imp&&re.test(l.desc||'')&&(!l.cat||l.cat==='A classificar')){editar(l,{cat:o.cat});n.lanc++}})});
  (d.avulsas||[]).forEach(function(o){if(porId(S.avulsas,o.id))return;S.avulsas.push(Object.assign({criado:Date.now()},o));n.av++});
  (d.carros||[]).forEach(function(o){var re=new RegExp(o.nome,'i');viv(S.carros).forEach(function(c){if(re.test(c.nome)){editar(c,o.patch);n.car++}})});
  (d.faturasPagas||[]).forEach(function(o){var p=o.k.split('|');if(!cartao(p[0]))return;var x=fatura(p[0],p[1]);if(x.resta<=0)return;
