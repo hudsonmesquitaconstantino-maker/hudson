@@ -277,6 +277,7 @@ function itensMes(ym){
   out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor,resta:x.resta,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:x.resta<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:x.pai});
   if(x.pai>0)out.push({kind:'reemb',id:c.id,ym:ym,data:x.vence,sinal:1,valor:x.pai,resta:x.paiPend,cert:'incerta',titulo:'Reembolso do seu pai ('+c.nome+')',status:x.paiPend<=0?'pago':'pendente'})});
  viv(S.carros).forEach(function(car){var ug=usaGestao(car);if(!ug&&!(car.semanal>0))return;semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){
+  var ex=excluidoEm(car);if(ex&&s>=ex&&!recebSemana('carro',car.id,s).length)return;
   var k=contaSemana(car,s);if(!k)return;var inf=k.inf;
   var base={kind:'carro',id:car.id,sem:s,data:s,sinal:1,contrato:inf.contrato||inf.valor,titulo:car.nome,nota:(k.aj.valor!=null?'valor desta semana ajustado por você':inf.nota)||'',motorista:inf.motorista||'',devido:k.devido,pagoParc:k.pago,multaInfo:k};
   if(k.devido<=0&&!k.rs.length){out.push(Object.assign(base,inf.status==='adiantado'?{valor:0,resta:0,cert:'certo',status:'adiantado'}:{valor:0,resta:0,cert:'certo',status:'parado',semContrato:inf.status==='semContrato'}));return}
@@ -348,7 +349,7 @@ function avisos(){var a=[],t=hoje();
  viv(S.rendas).forEach(function(r){if(r.diaConfirmar)a.push({c:'inc',i:'📅',h:'<b>'+esc(r.nome)+'</b>: confirme o dia da semana em que entra.',on:"abrirRenda('"+r.id+"')"})});
  var at=[];for(var m=S.inicio;m<=ymOf(t);m=addM(m,1))itensMes(m).forEach(function(x){if(x.status==='atrasado'&&x.sinal>0&&x.kind!=='multa'&&!x.parcial)at.push(x)});
  if(at.length)a.push({c:'bad',i:'⏰',h:at.length+' entrada(s) sem registro: '+at.slice(0,3).map(function(x){return esc(x.titulo)+' '+dbr(x.data)}).join(', ')+'.',on:"go('carros')"});
- var dcs=viv(S.carros).map(function(c){var d=extDocs(c);return d&&d.pend>0?[c.nome,d.pend]:null}).filter(Boolean);if(dcs.length)a.push({c:'inc',i:'📄',h:'Débitos e multas no Multas: '+dcs.map(function(x){return '<b>'+esc(x[0])+'</b> '+c2s(x[1])}).join(' · ')+'.',on:"go('carros')"});
+ var dcs=carrosAtivos().map(function(c){var d=extDocs(c);return d&&d.pend>0?[c.nome,d.pend]:null}).filter(Boolean);if(dcs.length)a.push({c:'inc',i:'📄',h:'Débitos e multas no Multas: '+dcs.map(function(x){return '<b>'+esc(x[0])+'</b> '+c2s(x[1])}).join(' · ')+'.',on:"go('carros')"});
  if(!vazio()&&(!S.backupEm||Date.now()-S.backupEm>7*864e5))a.push({c:'inc',i:'💾',h:'Faça um backup: os dados estão só neste aparelho.',on:"exportar()"});
  return a}
 
@@ -436,7 +437,7 @@ function vHoje(){
  var lim14=addD(p.t,14),outras=todas.filter(function(o){return grandes.indexOf(o)<0&&o.data<=lim14});
  if(outras.length){h+='<div class="card"><h2>Outras contas até '+dcurto(lim14)+'</h2>';outras.forEach(function(o){h+='<div class="dayh" style="margin-top:8px"><span>'+dlab(o.data)+'</span></div>'+linhaItem(o.x,true,o)});h+='</div>'}
  avisos().slice(0,5).forEach(function(a){h+='<div class="alert '+a.c+' tap" onclick="'+a.on+'"><i>'+a.i+'</i><div>'+a.h+'</div></div>'});
- var cs=viv(S.carros);if(cs.length){h+='<div class="card" style="background:none;box-shadow:none;padding:0;margin:16px 0 0"><h2 style="margin:0 2px">Seus carros<a onclick="go(\'carros\')">Ver ›</a></h2></div><div class="tiles">';
+ var cs=carrosAtivos();if(cs.length){h+='<div class="card" style="background:none;box-shadow:none;padding:0;margin:16px 0 0"><h2 style="margin:0 2px">Seus carros<a onclick="go(\'carros\')">Ver ›</a></h2></div><div class="tiles">';
   cs.forEach(function(c){var si=situacaoCarro(c),t0=hoje(),ws=[addM(ymOf(t0),-1),ymOf(t0),addM(ymOf(t0),1)].reduce(function(acc,ym){return ym<S.inicio?acc:acc.concat(itensMes(ym))},[]).filter(function(x){return x.kind==='carro'&&x.id===c.id&&x.status!=='parado'});
    var w=ws.filter(function(x){return x.status==='pago'&&x.data>=addD(t0,-6)}).pop()||ws.filter(function(x){return x.status!=='pago'&&x.data>=t0})[0];
    h+='<div class="tile" onclick="abrirDetCarro(\''+c.id+'\')"><div class="nm">🚗 '+esc(c.nome)+'</div><div class="st">'+esc(si.st)+'</div><div class="v '+(si.ativo?'':'muted')+'">'+(!w?'sem semanal':w.status==='pago'?'✓ '+c2s(w.valor):w.status==='adiantado'?'pago adiantado':c2s(w.valor))+'</div><div class="st">'+(!w?'':w.status==='pago'?'recebido '+dcurto(w.data):'próxima: '+dcurto(w.data))+'</div></div>'});h+='</div>'}
@@ -482,7 +483,7 @@ function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return 
  var custos=viv(S.fixas).filter(function(f){return f.carro===car.id&&fixaVigente(f,ym)}),cst=soma(custos,function(f){return valorFixa(f,ym)});
  var man=extManut(car,ym).mes,manSua=soma(man,function(m){return m.sua}),manConsid=Math.max(0,manSua-abat);
  return {ws:ws,contrato:contrato,rec:rec,abat:abat,custos:custos,cst:cst,man:man,manSua:manSua,manConsid:manConsid,res:rec-cst-manConsid}}
-function vCarros(){var h=mnav(),cs=viv(S.carros),rs=viv(S.rendas);
+function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas),nEx=viv(S.carros).length-cs.length;
  if(EXT_ERRO)h+='<div class="alert bad"><i>⚠️</i><div>'+esc(EXT_ERRO)+'</div></div>';
  else if(!extChave())h+='<div class="alert inf tap" onclick="abrirConexao()"><i>🔗</i><div><b>Conectar ao Gestão e ao Multas</b>: as semanais saem dos contratos e você vê manutenções e débitos de cada carro.</div></div>';
  cs.forEach(function(car){var k=contaCarro(car,M),si=situacaoCarro(car),dc=extDocs(car),g=extCarro(car);
@@ -499,6 +500,7 @@ function vCarros(){var h=mnav(),cs=viv(S.carros),rs=viv(S.rendas);
   h+='<div class="card tap" onclick="abrirRenda(\''+r.id+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div class="mid">💵 '+esc(r.nome)+'</div><span class="sub" style="font-size:20px">›</span></div><div class="sub" style="margin-top:4px">'+c2s(r.valor)+'/semana · '+DS[r.diaSem==null?3:r.diaSem]+(r.diaConfirmar?' (dia a confirmar)':'')+'</div>'+(ws.length?semanasHtml('renda',r.id,ws):'')+'</div>'});
  if(!cs.length&&!rs.length)h+='<div class="card"><div class="empty">Nenhuma entrada cadastrada.</div></div>';
  if(extChave())h+='<div class="sub" style="text-align:center;margin:6px 0 10px">Gestão e Multas: '+(EXT.em?'atualizado '+new Date(EXT.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'conectando…')+' · <a class="tap" style="color:var(--acc);font-weight:650" onclick="extSync(true)">atualizar</a></div>';
+ if(nEx>0)h+='<div class="sub" style="text-align:center;margin:0 0 10px">'+nEx+' carro'+(nEx>1?'s excluídos':' excluído')+' no Gestão não aparece'+(nEx>1?'m':'')+' mais aqui (os recebimentos antigos continuam no histórico).</div>';
  return h+'<button class="btn sec" onclick="abrirCarro()">+ Cadastrar carro</button><button class="btn sec" onclick="abrirRenda()">+ Cadastrar renda semanal</button>'}
 function primeiroNome(n){var p=String(n||'').trim().split(/\s+/)[0]||'';return p?p.charAt(0).toUpperCase()+p.slice(1).toLowerCase():''}
 function abrirDetCarro(id){var car=carro(id),k=contaCarro(car,M),si=situacaoCarro(car),g=extCarro(car),dc=extDocs(car);
@@ -511,7 +513,7 @@ function abrirDetCarro(id){var car=carro(id),k=contaCarro(car,M),si=situacaoCarr
  if(g){h+='<div class="card"><h2>🔧 Manutenções em '+mesNome(M)+'</h2>'+(k.man.length?k.man.map(function(m){return '<div class="row"><div class="g"><div class="t">'+esc(m.titulo)+'</div><div class="s">'+dlab(m.data)+(m.oficina?' · '+esc(m.oficina):'')+(m.dv?' · motorista pagou '+m.dv+'%':'')+'</div></div><div class="v">'+c2s(m.sua)+(m.sua!==m.tot?'<small>de '+c2s(m.tot)+'</small>':'')+'</div></div>'}).join(''):'<div class="empty">Nenhuma neste mês.</div>')+'</div>';
   if(dc)h+='<div class="card"><h2>📄 Documentos e multas</h2>'+(dc.itens.length?dc.itens.map(function(d){return '<div class="row"><div class="g"><div class="t">'+esc(d.nome)+'</div><div class="s">'+(d.venc?'vence '+dlab(d.venc):'sem vencimento')+(d.obs?' · '+esc(d.obs):'')+'</div></div><div class="v '+(d.valor!=null?'':'muted')+'">'+(d.valor!=null?c2s(d.valor):'valor ?')+'</div></div>'}).join('')+'<div class="kv" style="margin-top:4px"><span>Total pendente</span><b class="warnc">'+c2s(dc.pend)+'</b></div>':'<div class="empty">Nada pendente.</div>')+'</div>'}
  abrir(h+'<button class="btn sec" onclick="abrirCarro(\''+id+'\')">Editar o carro</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
-function acaoSemanal(){var cs=viv(S.carros);var t=hoje(),cand=[];
+function acaoSemanal(){var cs=carrosAtivos();var t=hoje(),cand=[];
  cs.forEach(function(c){[addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<S.inicio)return;itensMes(ym).forEach(function(x){if(x.kind==='carro'&&x.id===c.id&&x.resta>0&&(x.status==='pendente'||x.status==='atrasado')&&x.data<=addD(t,6))cand.push(x)})})});
  if(!cand.length){go('carros');return}
  abrir('<h3>Qual semanal entrou?</h3>'+cand.map(function(x){return '<div class="row tap" onclick="abrirSemana(\'carro\',\''+x.id+'\',\''+x.sem+'\')"><div class="bub in">🚗</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">semana de '+dlab(x.sem)+(x.parcial?' · falta parte':'')+'</div></div><div class="v">'+c2s(x.resta+((x.multaInfo&&x.multaInfo.restaMulta)||0))+'</div></div>'}).join('')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
@@ -546,6 +548,9 @@ function statusGestao(g){if(g.oficinaDesde){var o=String(g.oficinaOnde||'');retu
  return {ativo:'alugado',parado:'parado',venda:'compra e venda',pessoal:'pessoal'}[g.status]||g.status||'—'}
 function _iso(v){if(!v)return '';if(typeof v==='number')return iso(new Date(v));var s=String(v);if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);return m?m[3]+'-'+m[2]+'-'+m[1]:''}
 /* semanal pelo contrato do Gestão (igual à automação do Semanal): tem contrato na semana = tem semanal; sem contrato = sem semanal */
+/* carro excluído no Gestão: a data em que foi excluído (ou 0) */
+function excluidoEm(car){var t=car&&car.gpk&&EXT.excluidos&&EXT.excluidos[car.gpk];if(!t)return '';var d=new Date(Number(t));return iso(d)}
+function carrosAtivos(){return viv(S.carros).filter(function(c){return !excluidoEm(c)})}
 function usaGestao(car){return !!(car&&car.gpk&&EXT.contratos&&car.fonte!=='manual')}
 function contratoNaSemana(car,W){var ini=addD(W,-6),best=null;Object.keys(EXT.contratos||{}).forEach(function(id){var c=EXT.contratos[id];if(!c||c.del||normPlaca(c.carro)!==car.gpk||c.status==='revogado')return;
   var ci=_iso(c.inicio);if(!ci||ci>W)return;if(c.status!=='vigente'){var fe=_iso(c.encerradoEm);if(!fe||fe<ini)return}if(!best||ci>_iso(best.inicio))best=c});return best}
@@ -612,7 +617,9 @@ function extSync(manual){var k=extChave();if(!k||EXT_RODANDO)return;EXT_RODANDO=
   if(!carros||!Object.keys(carros).length)throw new Error('Não achei os carros do Gestão com essa chave. Confira a chave da família.');
   var cs={};Object.keys(carros).forEach(function(pk){var c=carros[pk];if(!c||!c.placa)return;var k2=normPlaca(c.placa);if(apag['car_'+k2]&&!(Number(c.restauradoEm)>Number(apag['car_'+k2])))return;
    cs[k2]={nome:c.nome||'',placa:c.placa,meuCarro:!!c.meuCarro,status:c.status||'',motorista:c.motorista||'',oficinaDesde:c.oficinaDesde||'',oficinaOnde:c.oficinaOnde||'',valorRef:c.valorRef||0,km:Number(c.kmUltima||c.kmAtual)||0}});
-  autoLigar(cs);
+  /* carro EXCLUÍDO no Gestão (Excluir de vez): some daqui também e não religa sozinho em outro carro */
+  var exc={};viv(S.carros).forEach(function(c){if(c.gpk&&!cs[c.gpk]){var t=Number(apag['car_'+c.gpk])||0;if(t)exc[c.gpk]=t}});
+  autoLigar(cs,exc);
   var meus={};viv(S.carros).forEach(function(c){if(c.gpk)meus[c.gpk]=1});
   var mm={};Object.keys(man).forEach(function(id){var m=man[id];if(!m||!meus[normPlaca(m.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(m.editadoEm)||Number(m.criadoEm)||0))return;
    mm[id]={carro:m.carro,dataIni:m.dataIni||'',dataFim:m.dataFim||'',divMot:m.divMot,motorista:m.motorista||'',texto:String(m.texto||'').slice(0,200),total:m.total||0,
@@ -622,10 +629,10 @@ function extSync(manual){var k=extChave();if(!k||EXT_RODANDO)return;EXT_RODANDO=
    mv[k3]={debitos:arr(v.debitos).map(function(d){return {tipo:d.tipo,ano:d.ano,valor:d.valor,venc:d.venc,pagoEm:d.pagoEm,obs:d.obs}}),multas:arr(v.multas).map(function(m){return {data:m.data,valor:m.valor,obs:m.obs}})}});
   var cc={};Object.keys(cts).forEach(function(id){var c=cts[id];if(!c||!meus[normPlaca(c.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(c.editadoEm)||Number(c.criadoEm)||0))return;
    cc[id]={carro:c.carro,tipo:c.tipo||'locacao',status:c.status||'vigente',inicio:c.inicio||'',fim:c.fim||'',encerradoEm:c.encerradoEm||'',semanal:c.semanal||0,venda:c.venda?{parcela:c.venda.parcela||0}:null,apelido:c.apelido||'',locatario:{nome:(c.locatario&&c.locatario.nome)||''},mesAdiantado:c.mesAdiantado||null,multaDiaria:Number(c.multaDiaria)||0,antecipada:!!String(c.cl34||'').trim()&&!(Number(c.semanaAntecipadaTransferidaValor)>0)}});
-  EXT={em:Date.now(),carros:cs,manut:mm,multas:mv,contratos:cc};try{localStorage.setItem(EXT_KEY,JSON.stringify(EXT))}catch(e){}
+  EXT={em:Date.now(),carros:cs,manut:mm,multas:mv,contratos:cc,excluidos:exc};try{localStorage.setItem(EXT_KEY,JSON.stringify(EXT))}catch(e){}
   EXT_ERRO='';EXT_RODANDO=false;render();if(manual)toast('Gestão e Multas atualizados')})
  .catch(function(e){EXT_RODANDO=false;EXT_ERRO=(e&&e.message)||'Não consegui ler o Gestão';if(/permission|denied/i.test(EXT_ERRO))EXT_ERRO='O banco recusou a leitura. Confira a chave da família.';render();if(manual)toast('⚠️ '+EXT_ERRO)})}
-function autoLigar(cs){var mud=false;viv(S.carros).forEach(function(c){if(c.gpk&&cs[c.gpk])return;var w=String(c.nome||'').split(/\s+/)[0].toLowerCase();if(!w)return;
+function autoLigar(cs,exc){var mud=false;viv(S.carros).forEach(function(c){if(c.gpk&&(cs[c.gpk]||(exc&&exc[c.gpk])))return;var w=String(c.nome||'').split(/\s+/)[0].toLowerCase();if(!w)return;
   var cand=Object.keys(cs).filter(function(k){return cs[k].meuCarro&&String(cs[k].nome||'').toLowerCase().split(/\s+/)[0]===w});
   if(cand.length!==1)cand=Object.keys(cs).filter(function(k){return String(cs[k].nome||'').toLowerCase().split(/\s+/)[0]===w&&cs[k].meuCarro});
   if(cand.length===1){c.gpk=cand[0];mud=true}});if(mud)save()}
