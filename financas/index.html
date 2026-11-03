@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=13, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=14, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -885,12 +885,15 @@ function abrirFixa(id){var f=id?fixa(id):null,meios=[['conta','Boleto ou débito
   '<div class="two">'+fNum('xDia','Dia do vencimento',f?f.dia:'','vazio = a confirmar')+fSel('xCat','Categoria',CATS.map(function(c){return [c,c]}),f?f.cat:'Casa')+'</div>'+
   fSel('xMeio','Como é paga',meios,f?(ehCartao(f.meio)?f.meio:'conta'):'conta','No cartão: entra dentro da fatura e não é somada de novo.')+fSel('xCarro','É de algum carro?',optCarros(),f?f.carro||'':'')+
   '<div class="two">'+fTxt('xIni','Começa em (mês)',f?f.inicio||'':ymOf(hoje()),'AAAA-MM')+fTxt('xFim','Termina em (mês)',f?f.fim||'':'','AAAA-MM ou vazio')+'</div>'+
-  '<button class="btn" onclick="salvarFixa('+(f?"'"+f.id+"'":'null')+')">Salvar</button>'+(f?'<button class="btn red" onclick="excluirFixa(\''+f.id+'\')">Excluir conta fixa</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
+  '<button class="btn" onclick="salvarFixa('+(f?"'"+f.id+"'":'null')+')">Salvar</button>'+(f&&!f.fim?'<button class="btn sec" onclick="cancelouFixa(\''+f.id+'\')">Cancelei: não vem mais</button>':'')+(f?'<button class="btn red" onclick="excluirFixa(\''+f.id+'\')">Excluir conta fixa</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
 var CATS=['A classificar','Alimentação','iFood','Mercado','Lazer','Saídas','Presentes','Assinaturas','Telefone e internet','Casa','Saúde','Academia','Compras','Jogos e digital','Transporte','Carros','Documentação','Seguros','Financiamentos','Cartão','Juros e taxas','Maquininha (dívida)','Multas e débitos','Brinquedos','Imprevistos','Outros'];
 function salvarFixa(id){var nome=val('xNome').trim(),v=dinheiro('xValor',true);if(!nome){toast('Dê um nome');return}if(v==null)return;var dia=parseInt(val('xDia'),10)||null;if(dia&&!(dia>=1&&dia<=31)){toast('Dia inválido');return}
  var ini=val('xIni').trim()||null,fim=val('xFim').trim()||null;if((ini&&!/^\d{4}-\d{2}$/.test(ini))||(fim&&!/^\d{4}-\d{2}$/.test(fim))){toast('Mês no formato AAAA-MM');return}
  var meio=val('xMeio'),p={nome:nome,valor:v,dia:dia,cat:val('xCat'),meio:meio==='conta'?'conta':meio,carro:val('xCarro')||null,inicio:ini,fim:fim};
  var f=id?fixa(id):null;if(!f)S.fixas.push(Object.assign({id:uid(),criado:Date.now()},p));else editar(f,p);save();fechar();render();toast('Conta fixa salva')}
+/* cancelou a assinatura: a última cobrança fica, as próximas somem */
+function cancelouFixa(id){var f=fixa(id),t=hoje(),ym=ymOf(t),dia=f.dia||1,fim=diaNoMes(ym,dia)<=t?ym:addM(ym,-1);
+ editar(f,{fim:fim});save();fechar();render();toast(f.nome+': última cobrança em '+mesNome(fim).split(' ')[0]+'. Não entra mais nas próximas faturas.')}
 function excluirFixa(id){if(!confirm('Excluir esta conta fixa? Os pagamentos já registrados continuam.'))return;editar(fixa(id),{del:true});save();fechar();render()}
 function abrirFixaMes(id,ym){var f=fixa(id),x=fixaMes(f,ym),o=S.fixasMes[x.k];
  var h='<h3>'+esc(f.nome)+' · '+mesNome(ym)+'</h3><div class="sub">Vence '+(f.dia?dlab(x.due):'(dia a confirmar)')+'</div>';
@@ -1025,6 +1028,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
   if(!c){if(!o.nome)return;S.cartoes.push(Object.assign({id:o.id,criado:Date.now()},p))}else{if(c.del)p.del=false;if(o.nomeSoSeVazio&&c.nome)delete p.nome;editar(c,p)}n.cart++});
  (d.faturas||[]).forEach(function(o){var f=S.faturas[o.k]||(S.faturas[o.k]={});if('banco' in o)editar(f,{banco:o.banco});if('pai' in o)editar(f,{pai:o.pai})});
  (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;editar(l,pt);return}S.lanc.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.lanc++});
+ (d.fixasNovas||[]).forEach(function(o){if(porId(S.fixas,o.id))return;S.fixas.push(Object.assign({criado:Date.now()},o));n.fix++});
  (d.fixas||[]).forEach(function(o){var re=new RegExp(o.nome,'i');viv(S.fixas).forEach(function(f){if(re.test(f.nome)){editar(f,o.patch);n.fix++}})});
  (d.recat||[]).forEach(function(o){var re=new RegExp(o.desc,'i');viv(S.lanc).forEach(function(l){if(l.imp&&re.test(l.desc||'')&&(!l.cat||l.cat==='A classificar')){editar(l,{cat:o.cat});n.lanc++}})});
  (d.avulsas||[]).forEach(function(o){if(porId(S.avulsas,o.id))return;S.avulsas.push(Object.assign({criado:Date.now()},o));n.av++});
