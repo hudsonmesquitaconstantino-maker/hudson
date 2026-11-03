@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=22, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=23, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -503,8 +503,11 @@ function heroMes(p,fim){var cs=viv(S.contas),mes=mesNome(ymOf(hoje())).split(' '
  if(pe.length)h+='<div class="det" style="margin-top:8px">Seu pai devolve '+c2s(soma(pe,function(x){return x.paiPend}))+' este mês ('+pe.map(function(x){return x.nome+' '+dbr(x.vence).slice(0,5)}).join(', ')+') · não é renda</div>';
  return h.replace('<div class="hero">','<div class="hero tap" onclick="abrirSaldo()">')+'</div>'}
 /* o dia mais próximo em que falta dinheiro (só aparece se faltar) — Hudson 03/11 */
-function proximoAperto(){var p=projecao(45);if(p.saldo==null)return '';var o=p.outs.filter(function(o){return o.saldo<0&&o.x.resta>0})[0];if(!o)return '';
- return '<div class="card" style="background:none;box-shadow:none;padding:0;margin:14px 0 0"><h2 style="margin:0 2px 2px">Próximo dia que falta dinheiro</h2></div>'+cardDecisao(o,p)}
+/* Hudson 03/11 (2): olha 90 dias; se não faltar, mostra numa linha até quando está coberto e qual é o dia mais apertado */
+function proximoAperto(){var p=projecao(90);if(p.saldo==null)return '';var os=p.outs.filter(function(o){return o.x.resta>0}),o=os.filter(function(o){return o.saldo<0})[0];
+ if(o)return '<div class="card" style="background:none;box-shadow:none;padding:0;margin:14px 0 0"><h2 style="margin:0 2px 2px">Próximo dia que falta dinheiro</h2></div>'+cardDecisao(o,p);
+ if(!os.length)return '';var m=os.reduce(function(a,b){return b.saldo<a.saldo?b:a});
+ return '<div class="card tap" onclick="'+acaoItem(m.x)+'" style="padding:13px 16px"><div style="display:flex;gap:10px;align-items:center"><div class="bub in">✓</div><div class="g"><div class="t" style="font-weight:700">Não falta dinheiro em nenhum dia até '+dcurto(p.ate)+'</div><div class="sub">Dia mais apertado: '+esc(m.x.titulo)+' em '+dcurto(m.data)+' · depois de pagar, sobra '+c2s(m.saldo)+'. Compras novas no cartão mudam a conta.</div></div></div></div>'}
 /* contas que vencem nesta semana, com ✓ de um toque */
 function blocoPagar7(p,velhas){var t=hoje(),lim=addD(t,7),os=p.outs.filter(function(o){return o.x.resta>0&&o.data<=lim&&velhas.indexOf(o)<0&&!(o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t))});
  if(!os.length)return '';
