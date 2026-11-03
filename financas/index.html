@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Financeiro">
-<meta name="theme-color" content="#F3F4F2">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icone-180.png">
 <title>Financeiro</title>
@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=24, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=25, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1267,5 +1267,30 @@ var PIX_CFG={sel:'input.money'};
 })();
 
 </script>
+<style id="modoEscuro">
+/* ===================== MODO ESCURO (padrão iPhone) — Hudson 03/11/2026 =====================
+   Camada única no fim do app: só cor, fundo e sombra. Não mexe em dado, função nem layout.
+   Paleta igual em todos os apps: fundo preto, cartões #1C1C1E, campos #2C2C2E, texto branco/cinza, âmbar, verde, vermelho do iOS. */
+:root:is(#escA,html):not(.gsplPre),:root:is(#escA,html):not(.gsplPre) body:is(#escB,body){background:#000!important;color:#F5F5F7}
+:root:is(#escA,html) body:is(#escB,body) input,:root:is(#escA,html) body:is(#escB,body) select,:root:is(#escA,html) body:is(#escB,body) textarea{color:#F5F5F7!important;border-color:#3A3A3C!important;caret-color:#F0A02E}
+:root:is(#escA,html) body:is(#escB,body) input::placeholder,:root:is(#escA,html) body:is(#escB,body) textarea::placeholder{color:#6E6E76!important}
+:root:is(#escA,html) body:is(#escB,body) input[type=date]::-webkit-calendar-picker-indicator,:root:is(#escA,html) body:is(#escB,body) input[type=month]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.7}
+/* placa continua placa de verdade: branca, letra preta, faixa azul */
+:root:is(#escA,html) body:is(#escB,body) .plate{background:#F2F2F2!important;border-color:#1b1d22!important}
+:root:is(#escA,html) body:is(#escB,body) .plate b,:root:is(#escA,html) body:is(#escB,body) .plate .num,:root:is(#escA,html) body:is(#escB,body) .plate input{color:#111!important;background:transparent!important}
+:root:is(#escA,html) body:is(#escB,body) .plate i,:root:is(#escA,html) body:is(#escB,body) .plate .top{background:#174A8C!important;color:#fff!important}
+:root:is(#escA,html) body:is(#escB,body) .pl{background:#F2F2F2!important;color:#111!important;border-color:#1b1d22!important}
+
+/* regras escuras que já existiam, agora sempre ligadas */
+:root{--bg:#0B0D0C;--card:#17191A;--card2:#1E2122;--tx:#F1F3F2;--tx2:#A4ABA7;--tx3:#6E7672;--line:#272B2A;--acc:#3FC59A;--accB:#2FA07D;--acc2:#11332A;--red:#FF6F64;--red2:#3A1714;--yel:#F7BE52;--yel2:#382A0B;--grn:#5BD487;--grn2:#12301D;--blue:#7DA8F6;--blue2:#14243F;--chip:#25292A;--sh:none}
+.hero{background:linear-gradient(145deg,#0D3F31,#145E48 70%,#1B7258);box-shadow:none}
+.btn{color:#04150F}
+nav#tabs #fab .plus{color:#04150F}
+.chips button.on{color:#04150F}
+button.okb{background:var(--acc);color:#04150F}
+
+:root{color-scheme:dark;--bg:#000000;--card:#1C1C1E;--card2:#2C2C2E;--line:#2C2C2E}
+
+</style>
 </body>
 </html>
