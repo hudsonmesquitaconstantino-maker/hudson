@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=25, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=26, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1162,6 +1162,7 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
   var meios=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(viv(S.cartoes).map(function(c){return [c.id,c.nome]}));
   h+='<div class="f"><label>Pagou com</label>'+chipsHtml(meios,NL.meio,'nlMeio')+'</div>';
   if(ehCartao(NL.meio)){h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(n){return '<button class="'+((+NL.parc||1)===n?'on':'')+'" onclick="nlSet(\'parc\','+n+')">'+(n===1?'À vista':n+'x')+'</button>'}).join('')+'<button class="'+(NL.de==='pai'?'on':'')+'" onclick="nlSet(\'de\',NL.de===\'pai\'?\'eu\':\'pai\')">É do pai</button></div></div>'+infoCartao()}
+  h+=fixaChipHtml();
   h+='<div class="f" id="lCarroBox" style="'+(NL.cat==='Carros'||NL.cat==='Multas e débitos'||NL.carro?'':'display:none')+'"><label>Qual carro</label>'+chipsHtml([['','Nenhum']].concat(carrosAtivos().filter(function(c){return true}).concat(NL.carro&&carro(NL.carro)&&excluidoEm(carro(NL.carro))?[carro(NL.carro)]:[]).map(function(c){return [c.id,c.nome.split(' ')[0]]})),NL.carro||'','nlCarro')+'</div>';
  }
  else if(NL.tipo==='entrada'){
@@ -1180,6 +1181,16 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
  h+=fData('lData','Data',NL.data||hoje()).replace('type="date"','type="date" onchange="lerNL();NL._re=1;formLanc()"');
  h+='<button class="btn" onclick="salvarLanc()">Salvar</button>'+(e?'<button class="btn red" onclick="desfazer(\''+NL.id+'\')">Apagar</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>';
  abrir(h);if(st)sh.scrollTop=st}
+/* Hudson 03/11 (4): "repete todo mês" — o gasto vira CONTA FIXA (no cartão ou boleto/débito) direto daqui.
+   Esta compra fica como está; a conta fixa começa no mês seguinte, no mesmo dia, para não contar duas vezes. */
+function fixaDoLanc(){var l=NL.id?porId(S.lanc,NL.id):null;return l&&l.fixaId?fixa(l.fixaId):null}
+function fixaChipHtml(){if(NL.tipo!=='gasto')return '';var fx=fixaDoLanc();
+ if(fx&&!fx.del)return '<div class="f"><div class="nlinfo tap" onclick="fechar();abrirFixa(\''+fx.id+'\')">🔁 Já é conta fixa: <b>'+esc(fx.nome)+'</b> · '+(fx.dia?'todo dia '+fx.dia:'dia a confirmar')+' · '+(ehCartao(fx.meio)?'no '+esc((cartao(fx.meio)||{}).nome||'cartão'):'boleto/débito')+' ›</div></div>';
+ if((+NL.parc||1)>1)return '';
+ var d=NL.data||hoje(),dia=+d.slice(8,10),ini=addM(ymOf(d),1),c=ehCartao(NL.meio)?cartao(NL.meio):null;
+ var h='<div class="f"><div class="chips"><button class="'+(NL.fixa?'on':'')+'" onclick="nlSet(\'fixa\','+(NL.fixa?0:1)+')">🔁 Repete todo mês (conta fixa)</button></div>';
+ if(NL.fixa)h+='<div class="nlinfo">Vira conta fixa: todo dia <b>'+dia+'</b>, '+(c?'no cartão <b>'+esc(c.nome)+'</b> (entra na fatura, não soma de novo)':'por <b>boleto/débito</b>')+', a partir de <b>'+mesNome(ini).split(' ')[0]+'</b>. Esta de '+mesNome(ymOf(d)).split(' ')[0]+' fica como está. Para parar: "Cancelei" na conta fixa (Mais).</div>';
+ return h+'</div>'}
 function nlTipo(t){lerNL();NL.tipo=t;if(t==='gasto'&&!NL.meio)NL.meio=S.ultMeio||contaPadrao();if(t!=='gasto'&&ehCartao(NL.meio))NL.meio=contaPadrao();NL._re=1;formLanc()}
 function nlMeio(m){nlSet('meio',m)}
 function nlCarro(c){nlSet('carro',c)}
@@ -1198,9 +1209,13 @@ function salvarLanc(){lerNL();var v=parseBRL(val('lVal'));if(NL.tipo==='ajuste')
  if(NL.tipo==='entrada'&&!desc){var on=(ORIG.filter(function(o){return o[0]===NL.orig})[0]||[])[1];if(on&&NL.orig!=='outra')desc=on+(car?' · '+car.nome:'')}
  var p={tipo:NL.tipo,valor:NL.tipo==='ajuste'?(NL.neg?-Math.abs(v):v):v,data:NL.data||hoje(),desc:desc,meio:NL.meio,cat:NL.tipo==='gasto'?NL.cat:null,de:gc?NL.de:'eu',parc:gc?(+NL.parc||1):1,dest:NL.tipo==='transf'?NL.dest:null,ref:NL.tipo==='reembolso'?NL.ref:null,
   carro:(NL.tipo==='gasto'||NL.tipo==='entrada')&&car?car.id:null,orig:NL.tipo==='entrada'?(NL.orig||'outra'):null};
- if(NL.id)editar(porId(S.lanc,NL.id),p);else S.lanc.push(Object.assign({id:uid(),criado:Date.now(),at:Date.now()},p));
+ var _lid=NL.id;if(NL.id)editar(porId(S.lanc,NL.id),p);else{_lid=uid();S.lanc.push(Object.assign({id:_lid,criado:Date.now(),at:Date.now()},p))}
+ var _fx=null;if(NL.tipo==='gasto'&&NL.fixa&&!fixaDoLanc()&&p.parc===1){
+  _fx={id:uid(),criado:Date.now(),nome:desc||p.cat||'Conta fixa',valor:v,dia:+p.data.slice(8,10),cat:p.cat,meio:ehCartao(p.meio)?p.meio:'conta',carro:p.carro||null,inicio:addM(ymOf(p.data),1),fim:null,doLanc:_lid};
+  S.fixas.push(_fx);editar(porId(S.lanc,_lid),{fixaId:_fx.id})}
  if(NL.tipo==='gasto')S.ultMeio=NL.meio;else if(!ehCartao(NL.meio))S.ultConta=NL.meio;
  save();fechar();render();
+ if(_fx){toast('🔁 Conta fixa criada: '+_fx.nome+' · todo dia '+_fx.dia+' a partir de '+mesNome(_fx.inicio).split(' ')[0]);return}
  if(gc){var c=cartao(NL.meio),ym=faturaDe(c,p.data);toast(c.nome+': fatura de '+mesNome(ym).split(' ')[0]+(p.parc>1?' · '+p.parc+'x':''))}else toast('Lançado')}
 function novoReembolso(){if(precisaConta())return;NL={tipo:'reembolso',meio:(viv(S.contas)[0]||{}).id,id:null};formLanc()}
 function novaTransf(){if(viv(S.contas).length<2){toast('Cadastre duas contas para transferir');return}NL={tipo:'transf',meio:viv(S.contas)[0].id,dest:viv(S.contas)[1].id,id:null};formLanc()}
