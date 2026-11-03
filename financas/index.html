@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=20, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=21, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -321,7 +321,7 @@ function itensMes(ym){
   if(k.carry){base.nota=(base.nota?base.nota+' · ':'')+'inclui '+c2s(k.carry)+' de '+k.carryL.length+' semana'+(k.carryL.length>1?'s':'')+' anterior'+(k.carryL.length>1?'es':'')}
   if(k.devido<=0&&!k.rs.length&&!k.carry){out.push(Object.assign(base,inf.status==='adiantado'?{valor:0,resta:0,cert:'certo',status:'adiantado'}:{valor:0,resta:0,cert:'certo',status:'parado',semContrato:inf.status==='semContrato'}));return}
   if(k.restaSem+k.carry<=0)out.push(Object.assign(base,{valor:Math.min(k.rec,Math.max(0,k.devido-k.abat))||k.rec,resta:0,cert:'certo',status:'pago'}));
-  else out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:car.incerto?'incerta':'provavel',status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}));
+  else out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:certCarro(car,inf,s),status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}));
   if(k.multa>0)out.push({kind:'multa',id:car.id,sem:s,data:addD(s,Math.max(0,k.dias-1)),sinal:1,valor:k.multa,resta:k.restaMulta,cert:'incerta',titulo:car.nome+' · multa',nota:k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md),status:k.restaMulta<=0?'pago':(addD(s,4)<t?'atrasado':'pendente')})})});
  viv(S.rendas).forEach(function(r){if(!(r.valor>0))return;if(r.inicio&&r.inicio>ym)return;semanasDoMes(ym,r.diaSem==null?3:+r.diaSem).forEach(function(s){
   var rs=recebSemana('renda',r.id,s),rec=soma(rs,function(l){return l.valor});
@@ -633,7 +633,7 @@ function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas),nEx=viv(S.car
  cs.forEach(function(car){var k=contaCarro(car,M),si=situacaoCarro(car),dc=extDocs(car),g=extCarro(car);
   var sub=[];if(si.inf&&si.inf.contrato)sub.push(c2s(si.inf.contrato)+'/semana');if(si.inf&&si.inf.motorista)sub.push(primeiroNome(si.inf.motorista));else if(!usaGestao(car)&&car.motorista)sub.push(car.motorista);
   h+='<div class="card tap" onclick="abrirDetCarro(\''+car.id+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div class="mid">'+esc(car.nome)+'</div><span class="sub" style="font-size:20px">›</span></div>'+
-   '<div style="margin-top:4px"><span class="pill '+(si.ativo?'ok':'bad')+'">'+esc(si.st)+'</span>'+(car.incerto&&si.ativo?' <span class="pill inc">incerto</span>':'')+'</div>'+(sub.length?'<div class="sub" style="margin-top:5px">'+esc(sub.join(' · '))+'</div>':'');
+   '<div style="margin-top:4px"><span class="pill '+(si.ativo?'ok':'bad')+'">'+esc(si.st)+'</span>'+(si.ativo&&certCarro(car,si.inf,null)==='incerta'?' <span class="pill inc">'+(excluidoEm(car)||(car.gpk&&EXT.carros&&!extCarro(car))?'fora do Gestão':'sem contrato')+'</span>':'')+'</div>'+(sub.length?'<div class="sub" style="margin-top:5px">'+esc(sub.join(' · '))+'</div>':'');
   if(k.ws.length)h+=semanasHtml('carro',car.id,k.ws);
   h+='<div class="kv"><span>Recebido no mês</span><b class="pos">'+c2s(k.rec)+(k.contrato?' <span class="sub">de '+c2s(k.contrato)+'</span>':'')+'</b></div><div class="kv"><span>Resultado do mês</span><b class="'+(k.res<0?'neg':'pos')+'">'+c2s(k.res)+'</b></div>';
   var ext=[];if(k.man.length)ext.push('🔧 '+k.man.length+' manutenç'+(k.man.length>1?'ões':'ão')+' · sua parte '+c2s(k.manSua));if(k.docT)ext.push('📄 '+c2s(k.docT)+' pagos no Multas');
@@ -700,6 +700,13 @@ function _iso(v){if(!v)return '';if(typeof v==='number')return iso(new Date(v));
 /* carro excluído no Gestão: a data em que foi excluído (ou 0) */
 function excluidoEm(car){var t=car&&car.gpk&&EXT.excluidos&&EXT.excluidos[car.gpk];if(!t)return '';var d=new Date(Number(t));return iso(d)}
 function carrosAtivos(){return viv(S.carros).filter(function(c){return !excluidoEm(c)})}
+/* Hudson 03/11: semanal de carro com contrato e motorista é PROVÁVEL (entra na conta).
+   Só é incerta se o carro saiu do Gestão ou está sem contrato / sem motorista. Não existe mais "incerto" manual para carro.
+   Carro sem Gestão: rodando = provável; sem motorista = marcar "parado" (aí não tem semanal). */
+function certCarro(car,inf,W){var ex=excluidoEm(car);if(ex&&(!W||W>=ex))return 'incerta';
+ if(car.gpk&&EXT.carros&&!extCarro(car))return 'incerta';
+ if(usaGestao(car))return inf&&inf.contrato>0?'provavel':'incerta';
+ return 'provavel'}
 function usaGestao(car){return !!(car&&car.gpk&&EXT.contratos&&car.fonte!=='manual')}
 function contratoNaSemana(car,W){var ini=addD(W,-6),best=null;Object.keys(EXT.contratos||{}).forEach(function(id){var c=EXT.contratos[id];if(!c||c.del||normPlaca(c.carro)!==car.gpk||c.status==='revogado')return;
   var ci=_iso(c.inicio);if(!ci||ci>W)return;if(c.status!=='vigente'){var fe=_iso(c.encerradoEm);if(!fe||fe<ini)return}if(!best||ci>_iso(best.inicio))best=c});return best}
@@ -965,12 +972,12 @@ function pagarFixa(id,ym){var v=dinheiro('mPag',true);if(v==null)return;S.ultCon
 /* carro e renda semanal */
 function abrirCarro(id){var c=id?carro(id):null,ab=c?paradaAberta(c):null;
  abrir('<h3>'+(c?esc(c.nome):'Novo carro')+'</h3>'+fTxt('rNome','Nome',c?c.nome:'','Ex.: Gol 2018')+fMoney('rSem','Semanal do contrato',c?c.semanal:null)+'<div class="two">'+fSel('rDs','Dia que paga',optDS(),c&&c.diaSem!=null?c.diaSem:3)+fTxt('rMot','Motorista',c?c.motorista:'','opcional')+'</div>'+
-  '<div class="two">'+fMoney('rMulta','Multa por dia de atraso',c?c.multaDia:null,(c&&usaGestao(c))?'Vem do contrato no Gestão. Só preencha para outro valor.':'Vazio = 1 diária (semanal ÷ 7).')+fSel('rCobra','Multa automática',[['1','Cobrar (quarta 12h até domingo)'],['0','Não cobrar']],c&&c.cobraMulta===false?'0':'1')+'</div>'+fSel('rInc','Essa entrada é',[['0','Provável (paga em dia)'],['1','Incerta (atrasa ou abate muito)']],c&&c.incerto?'1':'0','Incerta não entra no "pode gastar" até cair.')+(EXT.carros&&c&&c.gpk?fSel('rFonte','A semanal vem',[['gestao','Do contrato no Gestão (automático)'],['manual','Do valor digitado aqui']],c.fonte==='manual'?'manual':'gestao','Automático: tem contrato na semana = tem semanal. Sem contrato = sem semanal.'):'')+(EXT.carros?fSel('rGpk','Carro no Gestão',[['','Não ligar']].concat(Object.keys(EXT.carros).sort(function(x,y){return (EXT.carros[y].meuCarro?1:0)-(EXT.carros[x].meuCarro?1:0)||String(EXT.carros[x].nome).localeCompare(EXT.carros[y].nome)}).map(function(k){return [k,EXT.carros[k].nome+' · '+EXT.carros[k].placa+(EXT.carros[k].meuCarro?' (seu)':'')]})),c?c.gpk||'':'','Liga as manutenções do Gestão e os débitos do Multas a este carro.'):'')+
+  '<div class="two">'+fMoney('rMulta','Multa por dia de atraso',c?c.multaDia:null,(c&&usaGestao(c))?'Vem do contrato no Gestão. Só preencha para outro valor.':'Vazio = 1 diária (semanal ÷ 7).')+fSel('rCobra','Multa automática',[['1','Cobrar (quarta 12h até domingo)'],['0','Não cobrar']],c&&c.cobraMulta===false?'0':'1')+'</div>'+(EXT.carros&&c&&c.gpk?fSel('rFonte','A semanal vem',[['gestao','Do contrato no Gestão (automático)'],['manual','Do valor digitado aqui']],c.fonte==='manual'?'manual':'gestao','Automático: tem contrato na semana = tem semanal. Sem contrato = sem semanal.'):'')+(EXT.carros?fSel('rGpk','Carro no Gestão',[['','Não ligar']].concat(Object.keys(EXT.carros).sort(function(x,y){return (EXT.carros[y].meuCarro?1:0)-(EXT.carros[x].meuCarro?1:0)||String(EXT.carros[x].nome).localeCompare(EXT.carros[y].nome)}).map(function(k){return [k,EXT.carros[k].nome+' · '+EXT.carros[k].placa+(EXT.carros[k].meuCarro?' (seu)':'')]})),c?c.gpk||'':'','Liga as manutenções do Gestão e os débitos do Multas a este carro.'):'')+
   (c&&usaGestao(c)?'<div class="alert ok"><i>🔗</i><div>Situação e semanal vêm do Gestão: contrato vigente = tem semanal; na oficina ou sem contrato = sem semanal.</div></div>':'')+'<div class="f" style="'+(c&&usaGestao(c)?'display:none':'')+'"><label>Situação</label><div class="chips"><button id="rSitR" class="'+(ab?'':'on')+'" onclick="sitCarro(0)">Rodando</button><button id="rSitP" class="'+(ab?'on':'')+'" onclick="sitCarro(1)">Parado</button></div></div>'+
   '<div id="rParadoBox" style="'+(ab?'':'display:none')+'">'+fData('rParIni','Parado desde',ab?ab.ini:hoje())+'</div>'+
   '<button class="btn" onclick="salvarCarro('+(c?"'"+c.id+"'":'null')+')">Salvar</button>'+(c?'<button class="btn red" onclick="excluirCarro(\''+c.id+'\')">Excluir carro</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
 var _sitP=null;function sitCarro(p){_sitP=p;document.getElementById('rSitR').classList.toggle('on',!p);document.getElementById('rSitP').classList.toggle('on',!!p);document.getElementById('rParadoBox').style.display=p?'':'none'}
-function salvarCarro(id){var nome=val('rNome').trim();if(!nome){toast('Dê um nome');return}var sem=parseBRL(val('rSem'))||0,c=id?carro(id):null,p={nome:nome,semanal:sem,diaSem:+val('rDs'),motorista:val('rMot').trim(),incerto:val('rInc')==='1',multaDia:parseBRL(val('rMulta'))||0,cobraMulta:val('rCobra')!=='0'};if(document.getElementById('rGpk'))p.gpk=val('rGpk')||null;if(document.getElementById('rFonte'))p.fonte=val('rFonte');
+function salvarCarro(id){var nome=val('rNome').trim();if(!nome){toast('Dê um nome');return}var sem=parseBRL(val('rSem'))||0,c=id?carro(id):null,p={nome:nome,semanal:sem,diaSem:+val('rDs'),motorista:val('rMot').trim(),incerto:false,multaDia:parseBRL(val('rMulta'))||0,cobraMulta:val('rCobra')!=='0'};if(document.getElementById('rGpk'))p.gpk=val('rGpk')||null;if(document.getElementById('rFonte'))p.fonte=val('rFonte');
  if(!c){c=Object.assign({id:uid(),paradas:[],criado:Date.now()},p);S.carros.push(c)}else editar(c,p);
  var ab=paradaAberta(c),querParado=_sitP==null?!!ab:!!_sitP,ini=val('rParIni')||null;
  if(querParado&&!ab)c.paradas.push({id:uid(),ini:ini,fim:null,at:Date.now()});else if(querParado&&ab&&ini!==ab.ini)editar(ab,{ini:ini});else if(!querParado&&ab)editar(ab,{fim:addD(hoje(),-1)});
