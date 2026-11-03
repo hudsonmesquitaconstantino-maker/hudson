@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=10, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=11, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -247,7 +247,8 @@ function faturaDe(c,d){
  var due=diaNoMes(ym,V);return due>d?ym:addM(ym,1); /* sem dia de fechamento: próximo vencimento depois da compra */
 }
 function parcV(v,n,i){var b=Math.floor(v/n);return i===0?v-b*(n-1):b}
-function fixaVigente(f,ym){return !f.del&&(!f.inicio||f.inicio<=ym)&&(!f.fim||ym<=f.fim)}
+/* conta fixa de um carro excluído no Gestão (vendido): vale até o mês em que saiu e depois some (Hudson 03/11: seguro do Fiesta paga dia 5 e acabou). Financiamento NÃO some sozinho: dívida continua até você encerrar. */
+function fixaVigente(f,ym){if(f.del||(f.inicio&&f.inicio>ym)||(f.fim&&ym>f.fim))return false;if(f.carro&&f.cat!=='Financiamentos'&&!/financ/i.test(f.nome||'')){var c=carro(f.carro),ex=c&&excluidoEm(c);if(ex&&ym>ymOf(ex))return false}return true}
 function valorFixa(f,ym){var o=S.fixasMes[f.id+'|'+ym];return o&&o.valor!=null?o.valor:(f.valor||0)}
 function itensFatura(cid,ym){
  var c=cartao(cid),out=[];if(!c)return out;
@@ -735,10 +736,10 @@ function extSync(manual){var k=extChave();if(!k||EXT_RODANDO)return;EXT_RODANDO=
   return Promise.all([db.ref(base+'/gestao/carros').once('value'),db.ref(base+'/gestao/manutencoes').once('value'),db.ref(base+'/gestao/apagados').once('value'),db.ref(base+'/multas/veiculos').once('value'),db.ref(base+'/gestao/contratos').once('value')])})
  .then(function(r){var carros=r[0].val(),man=r[1].val()||{},apag=r[2].val()||{},mul=r[3].val()||{},cts=r[4].val()||{};
   if(!carros||!Object.keys(carros).length)throw new Error('Não achei os carros do Gestão com essa chave. Confira a chave da família.');
-  var cs={};Object.keys(carros).forEach(function(pk){var c=carros[pk];if(!c||!c.placa)return;var k2=normPlaca(c.placa);if(apag['car_'+k2]&&!(Number(c.restauradoEm)>Number(apag['car_'+k2])))return;
+  var cs={};Object.keys(carros).forEach(function(pk){var c=carros[pk];if(!c||!c.placa)return;var k2=normPlaca(c.placa),ta=Math.max(Number(apag['car_'+k2])||0,Number(apag[k2])||0);if(ta&&!(Number(c.restauradoEm)>ta))return;
    cs[k2]={nome:c.nome||'',placa:c.placa,meuCarro:!!c.meuCarro,status:c.status||'',motorista:c.motorista||'',oficinaDesde:c.oficinaDesde||'',oficinaOnde:c.oficinaOnde||'',valorRef:c.valorRef||0,km:Number(c.kmUltima||c.kmAtual)||0}});
   /* carro EXCLUÍDO no Gestão (Excluir de vez): some daqui também e não religa sozinho em outro carro */
-  var exc={};viv(S.carros).forEach(function(c){if(c.gpk&&!cs[c.gpk]){var t=Number(apag['car_'+c.gpk])||0;if(t)exc[c.gpk]=t}});
+  var exc={};viv(S.carros).forEach(function(c){if(c.gpk&&!cs[c.gpk]){var t=Math.max(Number(apag['car_'+c.gpk])||0,Number(apag[c.gpk])||0);if(t)exc[c.gpk]=t}});
   autoLigar(cs,exc);
   var meus={};viv(S.carros).forEach(function(c){if(c.gpk)meus[c.gpk]=1});
   var mm={};Object.keys(man).forEach(function(id){var m=man[id];if(!m||!meus[normPlaca(m.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(m.editadoEm)||Number(m.criadoEm)||0))return;
@@ -1076,7 +1077,7 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
   var meios=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(viv(S.cartoes).map(function(c){return [c.id,c.nome]}));
   h+='<div class="f"><label>Pagou com</label>'+chipsHtml(meios,NL.meio,'nlMeio')+'</div>';
   if(ehCartao(NL.meio)){h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(n){return '<button class="'+((+NL.parc||1)===n?'on':'')+'" onclick="nlSet(\'parc\','+n+')">'+(n===1?'À vista':n+'x')+'</button>'}).join('')+'<button class="'+(NL.de==='pai'?'on':'')+'" onclick="nlSet(\'de\',NL.de===\'pai\'?\'eu\':\'pai\')">É do pai</button></div></div>'+infoCartao()}
-  h+='<div class="f" id="lCarroBox" style="'+(NL.cat==='Carros'||NL.cat==='Multas e débitos'||NL.carro?'':'display:none')+'"><label>Qual carro</label>'+chipsHtml([['','Nenhum']].concat(viv(S.carros).map(function(c){return [c.id,c.nome.split(' ')[0]]})),NL.carro||'','nlCarro')+'</div>';
+  h+='<div class="f" id="lCarroBox" style="'+(NL.cat==='Carros'||NL.cat==='Multas e débitos'||NL.carro?'':'display:none')+'"><label>Qual carro</label>'+chipsHtml([['','Nenhum']].concat(carrosAtivos().filter(function(c){return true}).concat(NL.carro&&carro(NL.carro)&&excluidoEm(carro(NL.carro))?[carro(NL.carro)]:[]).map(function(c){return [c.id,c.nome.split(' ')[0]]})),NL.carro||'','nlCarro')+'</div>';
  }
  else if(NL.tipo==='entrada'){
   h+='<div class="f"><label>De onde veio</label>'+chipsHtml(ORIG,NL.orig||'outra','nlOrig')+'</div>';
@@ -1140,7 +1141,7 @@ function checaVersao(manual){fetch('./index.html?nv='+Date.now(),{cache:'no-stor
   if(n>APP_VER){var k='finH_rl_'+n,ja=0;try{ja=+sessionStorage.getItem(k)||0;sessionStorage.setItem(k,ja+1)}catch(e){}if(ja<2||manual){VER_NOVA=n;render();setTimeout(function(){location.reload()},400)}}
   else if(manual)toast('Você está na versão mais nova (v'+APP_VER+')')}).catch(function(){if(manual)toast('Sem internet para conferir a versão')})}
 setTimeout(function(){checaVersao(false)},1200);document.addEventListener('visibilitychange',function(){if(!document.hidden)checaVersao(false)});
-var _ultExt=0;function extTalvez(){if(extChave()&&Date.now()-_ultExt>10*60*1000){_ultExt=Date.now();extSync(false)}}
+var _ultExt=0;function extTalvez(){if(extChave()&&Date.now()-_ultExt>60*1000){_ultExt=Date.now();extSync(false)}}
 setTimeout(extTalvez,800);
 var _diaAberto=hoje();document.addEventListener('visibilitychange',function(){if(!document.hidden){if(hoje()!==_diaAberto){_diaAberto=hoje();M=mesPadrao();ML=ymOf(hoje())}render();extTalvez()}});
 </script>
