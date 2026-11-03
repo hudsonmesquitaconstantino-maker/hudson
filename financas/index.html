@@ -182,7 +182,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=23, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=24, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -278,11 +278,16 @@ function fatura(cid,ym){
   informado:f.banco!=null||its.some(function(i){return i.kind==='lanc'&&i.l.imp}),naoId:f.banco!=null?f.banco-som:0,pago:pago,resta:Math.max(0,valor-pago),pags:pags,reemb:reemb,paiPend:Math.max(0,pai-reemb),paiBase:f.pai!=null?f.pai:null,paiNovos:paiNovos};
 }
 function arredPai(v){var c=((v%100)+100)%100,r=(v-c)/100;return (c>50?r+1:r)*100}
-/* texto para mandar ao pai pelo WhatsApp: as compras dele nesta fatura e o total a devolver */
-function textoPai(cid,ym){var x=fatura(cid,ym),L=['*'+x.nome+' · fatura de '+mesNome(ym).split(' ')[0]+'*','Vence '+dsem(x.vence)+' '+dbr(x.vence).slice(0,5),''];
- if(x.paiBase!=null)L.push('• Compras e parcelas anteriores: R$ '+(x.paiBase/100).toLocaleString('pt-BR'));
- (x.paiBase!=null?x.paiNovos:x.its.filter(function(i){return i.pai})).slice().sort(function(a,b){return a.data<b.data?-1:1}).forEach(function(i){L.push('• '+dbr(i.data).slice(0,5)+' '+(i.nome||'Compra')+(i.n>1?' ('+i.i+'/'+i.n+')':'')+': R$ '+(arredPai(i.v)/100).toLocaleString('pt-BR'))});
- L.push('','*Total: R$ '+(x.pai/100).toLocaleString('pt-BR')+'*');if(x.reemb>0)L.push('Já devolvido: R$ '+(x.reemb/100).toLocaleString('pt-BR',{minimumFractionDigits:0})+' · falta R$ '+(x.paiPend/100).toLocaleString('pt-BR'));
+/* texto para mandar ao pai pelo WhatsApp (Hudson 03/11 (3)): TODAS as parcelas dele, mês a mês, a partir desta fatura,
+   no formato que ele usa: "*Cartão Hudson Todo dia 24*" e "• Novembro: *R$ 3.454*". Cada mês = parte do pai naquela fatura
+   (valor informado + compras novas marcadas "do pai", já arredondadas). Mês sem parcela dele não aparece. */
+function textoPai(cid,ym){var c=viv(S.cartoes).filter(function(c){return c.id===cid})[0]||{},ms=[];
+ for(var i=0;i<36;i++){var m=addM(ym,i),x=fatura(cid,m);if(x.pai>0)ms.push(x)}
+ var outros=viv(S.cartoes).some(function(o){if(o.id===cid)return false;for(var i=0;i<36;i++){if(fatura(o.id,addM(ym,i)).pai>0)return true}return false});
+ var R=function(v){return 'R$ '+Math.round(v/100).toLocaleString('pt-BR')},longo=ms.length>12;
+ var L=['*Cartão Hudson'+(outros&&c.nome?' ('+c.nome+')':'')+' Todo dia '+(+c.vence||1)+'*',''];
+ ms.forEach(function(x){var n=MESES[+x.ym.slice(5,7)-1];n=n.charAt(0).toUpperCase()+n.slice(1)+(longo?'/'+x.ym.slice(2,4):'');
+  L.push('• '+n+': *'+R(x.pai)+'*'+(x.reemb>0?(x.paiPend>0?' (já devolveu '+R(x.reemb)+', falta '+R(x.paiPend)+')':' ✅ pago'):''))});
  return L.join('\n')}
 function copiarPai(cid,ym){var t=textoPai(cid,ym);function ok(){toast('Copiado: é só colar no WhatsApp do seu pai')}
  try{navigator.clipboard.writeText(t).then(ok,function(){fb()})}catch(e){fb()}
