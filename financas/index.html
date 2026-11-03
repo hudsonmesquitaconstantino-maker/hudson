@@ -181,7 +181,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=8, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=9, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -476,8 +476,8 @@ function vHoje(){
  return h}
 /* Hoje: visão do mês — entradas, despesas e cartões (Hudson 03/11, inspirado no Minhas Finanças) */
 function visaoMes(){var ym=ymOf(hoje()),it=itensMes(ym);
- var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))});
- var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===ym&&(l.tipo==='entrada'||l.tipo==='recavulsa')}),function(l){return l.valor}),prevE=rec+soma(ent,function(x){return x.resta||0});
+ var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)});
+ var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===ym&&((l.tipo==='entrada'&&!(!l.fonte&&/venda/i.test(l.desc||'')))||l.tipo==='recavulsa')}),function(l){return l.valor}),prevE=rec+soma(ent,function(x){return x.resta||0});
  var ds=it.filter(function(x){return x.sinal<0}),totD=soma(ds,function(x){return x.valor}),pagoD=totD-soma(ds,function(x){return x.resta||0});
  var cs=viv(S.cartoes),fat=soma(cs,function(c){return fatura(c.id,ym).resta}),Ls=cs.map(limiteCartao).filter(Boolean),disp=soma(Ls,function(L){return L.disp});
  return '<div class="vm"><div class="vmt tap" onclick="AG=\'entradas\';go(\'agenda\')"><span class="ic in">↓</span><small>Entradas · '+MESES[+ym.slice(5,7)-1].slice(0,3)+'</small><b class="pos">'+c2s(rec)+'</b><em>previsto '+c2s(prevE)+'</em></div>'+
@@ -494,15 +494,20 @@ function blocoReceber(){var t=hoje(),lim=addD(t,6),its=[];
   '<div class="sub" style="margin-top:6px">✓ = recebi tudo hoje. Desconto de diária, multa ou valor diferente: toque na linha.</div></div>'}
 /* ===== Agenda: Tudo · Entradas · Despesas (Hudson 03/11: "visualizar o que são as entradas do mês e as despesas do mês") ===== */
 function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
+/* lista agrupada por dia, com a data em cima de cada grupo (igual à Agenda) */
+function listaPorDia(xs){var t=hoje(),dias={},ordem=[];xs.forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
+ ordem.sort();return ordem.map(function(d){return '<div class="dayh'+(d===t?' hoje':'')+'"><span>'+(d==='zz'?'Data a confirmar':(d===t?'Hoje · ':'')+dlab(d))+'</span></div>'+dias[d].map(function(x){return linhaItem(x,false,null)}).join('')}).join('')}
+function ehVenda(x){if(x.kind!=='lanc')return false;var l=porId(S.lanc,x.id);return !!(l&&l.tipo==='entrada'&&!l.fonte&&/venda/i.test(l.desc||''))}
 function vEntradas(){var it=itensMes(M),t=hoje();
- var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))});
- var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===M&&((l.tipo==='entrada')||l.tipo==='recavulsa')}),function(l){return l.valor});
+ var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)});
+ var vendas=it.filter(ehVenda);
+ var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===M&&((l.tipo==='entrada'&&!(!l.fonte&&/venda/i.test(l.desc||'')))||l.tipo==='recavulsa')}),function(l){return l.valor});
  var prev=soma(ent,function(x){return x.resta||0}),atr=soma(ent.filter(function(x){return x.status==='atrasado'||(x.resta>0&&x.data<t)}),function(x){return x.resta||0});
  var re=it.filter(function(x){return x.kind==='reemb'}),emp=it.filter(function(x){return x.kind==='lanc'&&/dívida/.test(x.titulo)});
  var h='<div class="card"><div class="tri"><div><span>Recebido</span><b class="pos">'+c2s(rec)+'</b></div><div><span>Falta receber</span><b>'+c2s(prev)+'</b></div><div><span>Total do mês</span><b>'+c2s(rec+prev)+'</b></div></div>'+(atr?'<div class="sub" style="margin-top:6px"><b class="neg">'+c2s(atr)+'</b> já venceu e não foi registrado.</div>':'')+'</div>';
  if(!ent.length)h+='<div class="card"><div class="empty">Nenhuma entrada neste mês.</div></div>';
- else h+='<div class="card">'+ent.map(function(x){return linhaItem(x,false,null)}).join('')+'</div>';
- if(re.length||emp.length)h+='<div class="card"><h2>Não é renda</h2>'+re.concat(emp).map(function(x){return linhaItem(x,false,null)}).join('')+'<div class="sub" style="margin-top:4px">Reembolso do seu pai e empréstimo entram no caixa, mas não são ganho.</div></div>';
+ else h+='<div class="card">'+listaPorDia(ent)+'</div>';
+ if(re.length||emp.length||vendas.length)h+='<div class="card"><h2>Entra no caixa, mas não é renda</h2>'+listaPorDia(re.concat(emp).concat(vendas))+'<div class="sub" style="margin-top:4px">Reembolso do seu pai, empréstimo e venda de carro entram no caixa, mas não são ganho do mês.</div></div>';
  return h}
 /* para onde vai o dinheiro do mês, por categoria: parcelas e compras das faturas que vencem no mês + gastos à vista + contas fixas + débitos pagos */
 function catsMes(ym){var c={},pai=0;function add(k,v){if(!(v>0))return;c[k]=(c[k]||0)+v}
@@ -521,7 +526,7 @@ function vDespesas(){var it=itensMes(M),t=hoje();
  if(ks.length){h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+ks.map(function(k){var v=cm.c[k],pc=tc?v/tc*100:0;return '<div class="catr"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+
   (cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas (ele devolve)</span><b>'+c2s(cm.pai)+'</b></div>':'')+(cm.c['A classificar']?'<div class="sub" style="margin-top:6px">"A classificar": compras que vieram da fatura sem categoria. Toque na compra (em Cartões) para escolher.</div>':'')+'</div>'}
  if(!ds.length)h+='<div class="card"><div class="empty">Nenhuma despesa neste mês.</div></div>';
- else h+='<div class="card"><h2>Contas e gastos</h2>'+ds.map(function(x){return linhaItem(x,false,null)}).join('')+'</div>';
+ else h+='<div class="card"><h2>Contas e gastos</h2>'+listaPorDia(ds)+'</div>';
  return h}
 function vAgenda(){if(AG==='entradas')return mnav()+segAg()+vEntradas();if(AG==='despesas')return mnav()+segAg()+vDespesas();
  var r=resumoMes(M),it=itensMes(M),h=mnav(),t=hoje(),ult=addD(addM(M,1)+'-01',-1),p=projecaoAte(ult<t?t:ult),sal=p.saldo;h+=segAg();
