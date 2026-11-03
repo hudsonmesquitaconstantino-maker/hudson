@@ -181,7 +181,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=7, APP_DATE='03/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=8, APP_DATE='03/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1002,7 +1002,9 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  if(!confirm((d.resumo||'Aplicar a atualização?')+(ja.length?'\n\nAtenção: você já tinha '+ja.length+' compra(s) lançada(s) nesses cartões; elas continuam e podem estar repetidas no total à vista.':'')+'\n\nNada do que você lançou é apagado.'))return;
  try{localStorage.setItem(KEY+'_antes_atualizacao',JSON.stringify(S))}catch(e){}
  var n={cart:0,lanc:0,fix:0,av:0,car:0,pag:0};
- (d.cartoes||[]).forEach(function(o){var c=cartao(o.id);var p={};['nome','fecha','vence','limite'].forEach(function(k){if(o[k]!==undefined)p[k]=o[k]});if(c&&c.fecha&&o.fechaSoSeVazio)delete p.fecha;if(c&&c.vence&&o.fechaSoSeVazio)delete p.vence;
+ (d.cartoes||[]).forEach(function(o){var c=cartao(o.id);var p={};['nome','fecha','vence','limite'].forEach(function(k){if(o[k]!==undefined)p[k]=o[k]});if(c&&c.fecha&&o.fechaSoSeVazio){delete p.fecha;
+   /* a atualização antiga trocou o dia de fechamento que você tinha posto: devolve o seu */
+   if(o.fechaVelha&&c.fecha===o.fechaVelha&&c.hist){for(var hi=c.hist.length-1;hi>=0;hi--){var pv=c.hist[hi].prev||{};if(pv.fecha!=null&&pv.fecha!==o.fechaVelha){p.fecha=pv.fecha;break}}}}if(c&&c.vence&&o.fechaSoSeVazio)delete p.vence;
   if(!c){if(!o.nome)return;S.cartoes.push(Object.assign({id:o.id,criado:Date.now()},p))}else{if(c.del)p.del=false;if(o.nomeSoSeVazio&&c.nome)delete p.nome;editar(c,p)}n.cart++});
  (d.faturas||[]).forEach(function(o){var f=S.faturas[o.k]||(S.faturas[o.k]={});if('banco' in o)editar(f,{banco:o.banco});if('pai' in o)editar(f,{pai:o.pai})});
  (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;editar(l,pt);return}S.lanc.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.lanc++});
@@ -1013,6 +1015,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  (d.faturasPagas||[]).forEach(function(o){var p=o.k.split('|');if(!cartao(p[0]))return;var x=fatura(p[0],p[1]);if(x.resta<=0)return;
   S.lanc.push({id:uid(),tipo:'pagfatura',ref:o.k,valor:x.resta,meio:'',fora:true,data:o.data||x.vence,criado:Date.now(),at:Date.now()});n.pag++});
  (d.semanas||[]).forEach(function(o){var re=new RegExp(o.carro,'i'),car=viv(S.carros).filter(function(c){return re.test(c.nome)})[0];if(!car)return;var key=car.id+'|'+o.W;if(S.semanas[key]&&S.semanas[key].imp===d.id)return;S.semanas[key]=Object.assign({},S.semanas[key]||{},o.patch,{imp:d.id,at:Date.now()})});
+ (d.removerAvulsas||[]).forEach(function(id){var a=porId(S.avulsas,id);if(a&&!a.del)editar(a,{del:true})});
  (d.substitui||[]).forEach(function(i){S.atualizacoesVelhas[i]=Date.now()});
  S.atualizacoes[d.id]=Date.now();save();M=mesPadrao();render();
  toast('Atualização aplicada: '+n.lanc+' compras/parcelas, '+n.cart+' cartões'+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
