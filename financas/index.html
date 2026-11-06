@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=32, APP_DATE='05/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=33, APP_DATE='05/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1521,6 +1521,23 @@ button.okb{background:var(--acc);color:#04150F}
 
 :root{color-scheme:dark;--bg:#000000;--card:#1C1C1E;--card2:#2C2C2E;--line:#2C2C2E}
 
+</style>
+<style id="estiloApple">
+/* Hudson 05/11: visual no estilo dos apps da Apple (Saúde/iOS 26): título grande, cartões com título colorido
+   e barra de abas flutuante em cápsula de vidro, com o + numa bolinha separada à direita */
+:root:is(#escA,html) body:is(#escB,body) header{padding:6px 18px 4px}
+:root:is(#escA,html) body:is(#escB,body) header h1{font-size:34px;font-weight:800;letter-spacing:-.8px}
+:root:is(#escA,html) body:is(#escB,body) .card h2{text-transform:none;letter-spacing:-.2px;font-size:17px;font-weight:700;color:var(--grn,#34C78A);margin:0 0 8px}
+:root:is(#escA,html) body:is(#escB,body) .card{border-radius:22px;padding:16px 16px 12px}
+:root:is(#escA,html) body:is(#escB,body) #tabs{left:14px;right:90px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);height:64px;padding:6px;grid-template-columns:repeat(5,1fr);gap:2px;border-radius:32px;border:.5px solid rgba(255,255,255,.14)!important;
+ background:rgba(36,36,40,.72)!important;-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);box-shadow:0 10px 30px rgba(0,0,0,.45)!important}
+:root:is(#escA,html) body:is(#escB,body) #tabs button[data-t]{border-radius:26px;justify-content:center;gap:2px;padding:0;color:#C7C7CC;font-size:10.5px;font-weight:650}
+:root:is(#escA,html) body:is(#escB,body) #tabs button[data-t].on{background:rgba(255,255,255,.12);color:var(--grn,#34C78A)}
+:root:is(#escA,html) body:is(#escB,body) #tabs button[data-t] svg{width:23px;height:23px}
+:root:is(#escA,html) body:is(#escB,body) #tabs #fab{position:absolute;right:-76px;top:0;bottom:auto;width:64px;height:64px;border-radius:50%;padding:0;font-size:0;gap:0;justify-content:center;
+ background:rgba(36,36,40,.72);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:.5px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+:root:is(#escA,html) body:is(#escB,body) #tabs #fab .plus{width:46px;height:46px;border-radius:50%;background:var(--grn,#34C78A)}
+:root:is(#escA,html) body:is(#escB,body) #tabs #fab .plus svg{width:24px;height:24px}
 </style>
 </body>
 </html>
