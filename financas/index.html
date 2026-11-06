@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=35, APP_DATE='06/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=36, APP_DATE='06/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1562,6 +1562,14 @@ button.okb{background:var(--acc);color:#04150F}
  background:rgba(36,36,40,.72);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:.5px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45)}
 :root:is(#escA,html) body:is(#escB,body) #tabs #fab .plus{width:46px;height:46px;border-radius:50%;background:var(--grn,#34C78A)}
 :root:is(#escA,html) body:is(#escB,body) #tabs #fab .plus svg{width:24px;height:24px}
+
+/* teclado aberto: esconde a barra flutuante */
+:root:is(#escA,html).tecladoAberto body:is(#escB,body) #tabs{display:none!important}
 </style>
+<script id="tecladoBarra">/* Hudson 06/11: com o teclado aberto, a barra flutuante de baixo some (não cobre o que você está digitando) */
+(function(){var R=document.documentElement;function campo(e){if(!e)return false;var t=e.tagName;if(t==='TEXTAREA'||t==='SELECT'||e.isContentEditable)return true;return t==='INPUT'&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(e.type||'')}
+function upd(){var vv=window.visualViewport,kb=vv?(window.innerHeight-vv.height*vv.scale>140):false;R.classList.toggle('tecladoAberto',campo(document.activeElement)||kb)}
+document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,150)},true);if(window.visualViewport)window.visualViewport.addEventListener('resize',upd)})();
+</script>
 </body>
 </html>
