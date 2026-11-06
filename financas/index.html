@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=34, APP_DATE='06/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=35, APP_DATE='06/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -524,34 +524,53 @@ function abrirUni(kind,id,ref){if(precisaConta())return;var t=hoje(),u={kind:kin
  else if(kind==='fixa'){var f=fixa(id),x=fixaMes(f,ref);u.titulo=f.nome;u.sinal=-1;u.meta='conta fixa · vence '+(f.dia?dcurto(x.due):'(dia a confirmar)')+(ehCartao(f.meio)?' · no cartão':'');u.resta=x.resta;u.pags=x.pags;u.carroId=f.carro||null;
   if(ehCartao(f.meio))return abrirFixaMes(id,ref)}
  else if(kind==='avulsa'){var a=porId(S.avulsas,id),pg=viv(S.lanc).filter(function(l){return l.ref===id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')});u.titulo=a.desc;u.sinal=a.receber?1:-1;u.meta=(a.receber?'a receber':'a pagar')+' · '+dcurto(a.data)+(a.incerto?' · incerto':'');u.resta=Math.max(0,a.valor-soma(pg,function(l){return l.valor}));u.pags=pg;u.carroId=a.carro||null;u.dataItem=a.data}
- u.v=u.resta;u.data=t;u.meio=S.ultConta&&conta(S.ultConta)&&!conta(S.ultConta).del?S.ultConta:contaPadrao();U=u;uniDesenha()}
-function uniDesenha(){var u=U,rec=u.sinal>0,h='<h3>'+esc(u.titulo)+'</h3><div class="sub">'+esc(u.meta)+(u.carroId&&carro(u.carroId)&&u.kind!=='carro'?' · '+esc(carro(u.carroId).nome):'')+'</div>';
+ u.v=u.resta;u.modo='';u.verQuando=false;u.data=t;u.meio=S.ultConta&&conta(S.ultConta)&&!conta(S.ultConta).del?S.ultConta:contaPadrao();U=u;uniDesenha()}
+/* Hudson 06/11: "falei uma coisa tão simples" — toque abre: Total · Recebido · Falta, e três botões claros:
+   Recebi tudo · Recebi só uma parte · Mudar a data (ou o valor). Sem o "Já aconteceu? / Ainda não". */
+function uniDesenha(){var u=U,rec=u.sinal>0,av=u.kind==='avulsa',pg=soma(u.pags,function(l){return l.valor}),md=u.modo||'';
+ var h='<h3>'+esc(u.titulo)+'</h3><div class="sub">'+esc(u.meta)+(u.carroId&&carro(u.carroId)&&u.kind!=='carro'?' · '+esc(carro(u.carroId).nome):'')+'</div>';
  if(u.extra.length)h+='<div class="sub" style="margin-top:4px">'+u.extra.join(' · ')+'</div>';
- var _pg=soma(u.pags,function(l){return l.valor});
- if(_pg>0&&u.resta>0)h+='<div class="card" style="margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:4px"><div><div class="sub">Total</div><b>'+c2s(_pg+u.resta)+'</b></div><div><div class="sub">'+(rec?'Recebido':'Pago')+'</div><b class="pos">'+c2s(_pg)+'</b></div><div><div class="sub">Falta</div><b class="neg">'+c2s(u.resta)+'</b></div></div>';
- if(u.pags.length)h+='<div class="card" style="margin-top:10px"><h2>'+(rec?'Já recebido':'Já pago')+'</h2>'+u.pags.map(function(l){return '<div class="row"><div class="ck on" style="cursor:default">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm sec" style="width:auto;margin:0" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'}).join('')+'</div>';
- if(u.resta>0){
-  h+=fMoney('uVal',u.feito&&u.kind!=='renda'?(rec?'Quanto recebeu':'Quanto pagou')+(u.pags.length?' agora':'')+' <span style="font-weight:500;color:var(--tx2)">· '+(u.pags.length?'falta ':'total ')+c2s(u.resta)+'</span>':u.pags.length?(rec?'Falta receber':'Falta pagar'):'Valor',u.v).replace('class="money"','class="money" style="font-size:26px;font-weight:800"')+(u.feito&&u.kind!=='renda'?'<small style="display:block;margin:-4px 2px 10px;font-size:12.5px;color:var(--tx2)">'+(rec?'Recebeu só uma parte? Digite quanto entrou.':'Pagou só uma parte? Digite quanto saiu.')+'</small>':'')+'<div id="uAsk"></div>';
-  h+='<div class="f"><label>Já aconteceu?</label><div class="sw2"><button class="'+(u.feito?'on':'')+'" onclick="uniLer();U.feito=true;uniDesenha()">Sim, '+(rec?'recebi':'paguei')+'</button><button class="'+(!u.feito?'on':'')+'" onclick="uniLer();U.feito=false;uniDesenha()">Ainda não</button></div>'+
-   (u.feito&&u.kind==='avulsa'?'<small>Só quer mudar a data ou o valor? Toque em <b>Ainda não</b>.</small>':'')+(!u.feito?'<small>'+(u.kind==='avulsa'?'Pode mudar o valor ou a data. ':'Se mudar o valor, muda só '+(u.kind==='fixa'?'neste mês':'nesta semana')+'. ')+'Não mexe no saldo.</small>':'')+'</div>';
-  if(u.feito){h+=fData('uData',rec?'Recebi em':'Paguei em',u.data);var cs=optContas();if(cs.length>1)h+='<div class="f"><label>'+(rec?'Caiu em':'Saiu de')+'</label><div class="chips">'+cs.map(function(c){return '<button class="'+(u.meio===c[0]?'on':'')+'" onclick="uniLer();U.meio=\''+c[0]+'\';uniDesenha()">'+esc(c[1])+'</button>'}).join('')+'</div></div>'}
-  else if(u.kind==='avulsa')h+=fData('uData',rec?'Data combinada para receber':'Data para pagar',u.dataItem);
-  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar</button>'}
- else h+='<div class="alert ok" style="margin-top:10px"><i>✓</i><div>'+(rec?'Recebido':'Pago')+' por completo.</div></div>';
- var mais=u.kind==='carro'?"abrirSemanaCarro('"+u.id+"','"+u.ref+"')":u.kind==='renda'?"abrirSemana('renda','"+u.id+"','"+u.ref+"',1)":u.kind==='fixa'?"abrirFixaMes('"+u.id+"','"+u.ref+"')":"abrirAvulsa('"+u.id+"')";
- h+='<button class="btn sec" onclick="'+mais+'">'+(u.kind==='carro'?'Mais opções (diárias, multa, abateu manutenção)':u.kind==='avulsa'?'Editar nome, total ou apagar':'Mais opções')+'</button><button class="btn sec" onclick="fechar()">Fechar</button>';
- abrir(h);var el=document.getElementById('uVal');if(el)el.addEventListener('input',uniPergunta);uniPergunta()}
-function uniLer(){var v=document.getElementById('uVal');if(v){var n=parseBRL(v.value);U.v=n==null?U.v:n}var d=document.getElementById('uData');if(d&&d.value){if(U.feito)U.data=d.value;else U.dataItem=d.value}}
+ h+='<div class="card" style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:4px;padding:14px 8px"><div><div class="sub">Total</div><b style="font-size:17px">'+c2s(pg+u.resta)+'</b></div><div><div class="sub">'+(rec?'Recebido':'Pago')+'</div><b class="pos" style="font-size:17px">'+c2s(pg)+'</b></div><div><div class="sub">Falta</div><b class="'+(u.resta>0?'neg':'pos')+'" style="font-size:17px">'+c2s(u.resta)+'</b></div></div>';
+ if(av&&u.resta>0)h+='<div class="sub" style="margin:-2px 2px 10px">📅 '+(rec?'Combinado para receber':'Combinado para pagar')+': <b>'+dlab(u.dataItem)+'</b></div>';
+ if(u.resta<=0)h+='<div class="alert ok" style="margin-top:6px"><i>✓</i><div>'+(rec?'Recebido':'Pago')+' por completo.</div></div>';
+ else if(!md){
+  h+=uniQuando();
+  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniTudo()">'+(pg>0?(rec?'Recebi o resto':'Paguei o resto'):(rec?'Recebi tudo':'Paguei tudo'))+' · '+c2s(u.resta)+'</button>';
+  h+='<button class="btn sec" onclick="uniModo(\'parte\')">'+(rec?'Recebi só uma parte':'Paguei só uma parte')+'</button>';
+  if(av)h+='<button class="btn sec" onclick="uniModo(\'data\')">📅 Mudar a data</button>';
+  else if(u.kind!=='renda')h+='<button class="btn sec" onclick="uniModo(\'valor\')">Mudar o valor '+(u.kind==='fixa'?'deste mês':'desta semana')+'</button>'}
+ else if(md==='parte'){
+  h+='<div class="card" style="margin-top:4px">'+fMoney('uVal',rec?'Quanto recebeu?':'Quanto pagou?',u.v).replace('class="money"','class="money" style="font-size:26px;font-weight:800"')+'<div id="uAsk"></div>'+uniQuando()+'</div>';
+  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar</button><button class="btn sec" onclick="uniModo(\'\')">Voltar</button>'}
+ else if(md==='data'){
+  h+='<div class="card" style="margin-top:4px">'+fData('uData',rec?'Nova data para receber '+c2s(u.resta):'Nova data para pagar '+c2s(u.resta),u.dataItem)+'<small style="display:block;font-size:12.5px;color:var(--tx2);margin:-4px 2px 0">Não mexe no saldo.</small></div>';
+  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar nova data</button><button class="btn sec" onclick="uniModo(\'\')">Voltar</button>'}
+ else if(md==='valor'){
+  h+='<div class="card" style="margin-top:4px">'+fMoney('uVal',pg>0?(rec?'Quanto ainda falta receber':'Quanto ainda falta pagar'):'Novo valor '+(u.kind==='fixa'?'deste mês':'desta semana'),u.v)+'<small style="display:block;font-size:12.5px;color:var(--tx2);margin:-4px 2px 0">Muda só '+(u.kind==='fixa'?'neste mês':'nesta semana')+'. Não mexe no saldo.</small></div>';
+  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar novo valor</button><button class="btn sec" onclick="uniModo(\'\')">Voltar</button>'}
+ if(u.pags.length&&!md)h+='<div class="card" style="margin-top:14px"><h2>'+(rec?'Já recebido':'Já pago')+'</h2>'+u.pags.map(function(l){return '<div class="row"><div class="ck on" style="cursor:default">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm sec" style="width:auto;margin:0" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'}).join('')+'</div>';
+ if(!md){var mais=u.kind==='carro'?"abrirSemanaCarro('"+u.id+"','"+u.ref+"')":u.kind==='renda'?"abrirSemana('renda','"+u.id+"','"+u.ref+"',1)":u.kind==='fixa'?"abrirFixaMes('"+u.id+"','"+u.ref+"')":"abrirAvulsa('"+u.id+"')";
+  h+='<button class="btn sec" onclick="'+mais+'">'+(u.kind==='carro'?'Mais opções (diárias, multa, adiar, abateu manutenção)':av?'Editar nome, total ou apagar':'Mais opções')+'</button><button class="btn sec" onclick="fechar()">Fechar</button>'}
+ abrir(h);var el=document.getElementById('uVal');if(el&&md==='parte'){el.addEventListener('input',uniPergunta);setTimeout(function(){try{el.focus()}catch(e){}},250)}uniPergunta()}
+/* quando e onde entrou: uma linha só ("hoje · Nubank  trocar"); abre data e contas se tocar */
+function uniQuando(){var u=U,rec=u.sinal>0,cs=optContas(),c=conta(u.meio);
+ if(!u.verQuando)return '<div class="sub" style="margin:2px 2px 10px">'+(rec?'Entra':'Sai')+' <b>'+(u.data===hoje()?'hoje':dlab(u.data))+'</b>'+(c?' · <b>'+esc(c.nome)+'</b>':'')+' · <a href="#" onclick="event.preventDefault();uniLer();U.verQuando=true;uniDesenha()" style="color:var(--acc);font-weight:600">trocar</a></div>';
+ var h=fData('uQuando',rec?'Recebi em':'Paguei em',u.data);
+ if(cs.length>1)h+='<div class="f"><label>'+(rec?'Caiu em':'Saiu de')+'</label><div class="chips">'+cs.map(function(o){return '<button class="'+(u.meio===o[0]?'on':'')+'" onclick="uniLer();U.meio=\''+o[0]+'\';uniDesenha()">'+esc(o[1])+'</button>'}).join('')+'</div></div>';
+ return h}
+function uniModo(m){uniLer();U.modo=m;U.feito=m==='parte'||!m;U.v=m==='valor'?U.resta:null;U.novaData=null;U.resto='deve';uniDesenha()}
+function uniTudo(){uniLer();U.modo='';U.feito=true;uniSalvar(U.resta)}
+function uniLer(){var v=document.getElementById('uVal');if(v){var n=parseBRL(v.value);U.v=n}var q=document.getElementById('uQuando');if(q&&q.value)U.data=q.value;var d=document.getElementById('uData');if(d&&d.value)U.dataItem=d.value}
 function uniPergunta(){var a=document.getElementById('uAsk');if(!a||!U)return;var n=parseBRL(val('uVal'));
  if(U.feito&&n!=null&&n>0&&n<U.resta&&U.kind!=='renda'){var f=U.resta-n,rec=U.sinal>0;
   var nv=U.novaData||(U.dataItem&&U.dataItem>hoje()?U.dataItem:addD(hoje(),7));
   a.innerHTML='<div class="alert inc" style="display:block"><b>Faltaram '+c2s(f)+'. O que é isso?</b><div class="chips" style="margin-top:8px"><button class="'+(U.resto==='deve'?'on':'')+'" onclick="U.resto=\'deve\';uniPergunta()">'+(rec?'Ainda me deve':'Ainda vou pagar o resto')+'</button><button class="'+(U.resto==='desc'?'on':'')+'" onclick="U.resto=\'desc\';uniPergunta()">'+(rec?'Foi desconto':'Ficou mais barato')+'</button></div>'+
    (U.kind==='avulsa'&&U.resto==='deve'?'<div class="f" style="margin:10px 0 0"><label>'+(rec?'Quando ele vai pagar o resto?':'Quando vai pagar o resto?')+'</label><input type="date" id="uNova" value="'+nv+'" onchange="U.novaData=this.value"></div>':'')+'</div>'}
  else a.innerHTML=''}
-function uniSalvar(){uniLer();var u=U,v=parseBRL(val('uVal'));if(v==null||v<0){toast('Digite o valor');return}
+function uniSalvar(vf){uniLer();var u=U,v=vf!=null?vf:document.getElementById('uVal')?parseBRL(val('uVal')):u.resta;if(v==null||v<0){toast('Digite o valor');return}
  var t=Date.now(),ids=[],semUndo=null,msg='';
  if(u.feito){if(!(v>0)){toast('Digite quanto '+(u.sinal>0?'entrou':'saiu'));return}
-  var meio=u.meio||contaPadrao(),data=val('uData')||hoje(),falta=Math.max(0,u.resta-v),desc=falta>0&&u.resto==='desc';
+  var meio=u.meio||contaPadrao(),data=u.data||hoje(),falta=Math.max(0,u.resta-v),desc=falta>0&&u.resto==='desc';
   if(u.kind==='carro'){var car=carro(u.id),k=contaSemana(car,u.ref),key=u.id+'|'+u.ref;
    if(desc){semUndo={k:key,v:S.semanas[key]?JSON.parse(JSON.stringify(S.semanas[key])):undefined};var cut=Math.min(falta,k.devido);S.semanas[key]=Object.assign({},S.semanas[key]||{},{valor:Math.max(0,k.devido-cut),motivo:'desconto de '+c2s(cut),at:t})}
    ids=lancaPagamento(car,u.ref,v,{abat:0,motivo:'',meio:meio,data:data,hora:data===hoje()?horaAgora():''});
@@ -569,7 +588,7 @@ function uniSalvar(){uniLer();var u=U,v=parseBRL(val('uVal'));if(v==null||v<0){t
  if(u.kind==='carro'&&mudou){var car2=carro(u.id),kk=contaSemana(car2,u.ref),key2=u.id+'|'+u.ref;S.semanas[key2]=Object.assign({},S.semanas[key2]||{},{valor:Math.max(0,kk.devido+(v-u.resta)),motivo:'valor combinado',at:t})}
  else if(u.kind==='fixa'&&mudou){var x2=fixaMes(fixa(u.id),u.ref);S.fixasMes[x2.k]=Object.assign({},S.fixasMes[x2.k]||{},{valor:x2.pago+v})}
  else if(u.kind==='avulsa'){var a2=porId(S.avulsas,u.id),pg2=soma(u.pags,function(q){return q.valor}),p={};if(mudou)p.valor=pg2+v;var nd=val('uData');if(nd&&nd!==a2.data)p.data=nd;if(Object.keys(p).length)editar(a2,p)}
- save();fechar();render();toast(mudou||u.kind==='avulsa'?'Salvo · não mexeu no saldo':'Nada mudou')}
+ save();fechar();render();toast(u.kind==='avulsa'&&u.modo==='data'?'Nova data: '+dlab(u.dataItem)+' · não mexeu no saldo':mudou?'Salvo · não mexeu no saldo':'Nada mudou')}
 
 /* ---------- o "+": um formulário só ---------- */
 var NU=null;
