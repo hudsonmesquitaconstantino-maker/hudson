@@ -164,6 +164,12 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
 .rcs>span{font-weight:400;font-size:13px;color:var(--tx2);padding-left:10px}.rcs>em{font-size:13px;color:var(--tx2)}
 .rcl{border-top:1px solid rgba(127,127,127,.25);margin-top:4px;padding-top:8px}.rcl>span{font-weight:800}.rcl>em b{font-size:16.5px}
 .rc1 .rc{grid-template-columns:minmax(0,1fr) auto}
+.ck{flex:0 0 30px;width:30px;height:30px;border-radius:50%;border:2px solid var(--tx3,#6E6E76);background:none;display:flex;align-items:center;justify-content:center;color:#04130c;font-weight:900;font-size:15px;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.ck.in{border-color:var(--grn)}.ck.out{border-color:var(--red)}.ck.on{background:var(--grn);border-color:var(--grn)}
+.sw2{display:flex;gap:8px}.sw2 button{flex:1;border:1px solid var(--line,rgba(127,127,127,.3));background:var(--card2);color:var(--tx2);border-radius:12px;padding:12px 8px;font:inherit;font-weight:700;font-size:14.5px;cursor:pointer}
+.sw2 button.on{background:rgba(52,199,138,.16);border-color:var(--grn);color:var(--grn)}.sw2 button.onr{background:rgba(255,107,94,.14);border-color:var(--red);color:var(--red)}
+.nusug{background:var(--card2);border-radius:12px;margin-top:6px;overflow:hidden}.nusug button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line,rgba(127,127,127,.25));color:var(--tx);padding:10px 14px;font:inherit;font-size:15px;cursor:pointer}.nusug button:first-child{border-top:0}.nusug small{color:var(--tx2)}
+.grpc>.gh{display:flex;align-items:center;gap:11px;cursor:pointer;padding:10px 0}.grpc .av{flex:0 0 30px;height:30px;border-radius:50%;background:rgba(255,107,94,.16);color:var(--red);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}.grpc .gs{margin-left:41px}
 </style>
 </head>
 <body>
@@ -172,7 +178,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
 <nav id="tabs">
  <button data-t="hoje" onclick="go('hoje')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>Hoje</button>
  <button data-t="agenda" onclick="go('agenda')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
- <button id="fab" aria-label="Novo lançamento" onclick="novoLanc()"><span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Lançar</button>
+ <button id="fab" aria-label="Novo lançamento" onclick="novoUnico()"><span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Lançar</button>
  <button data-t="cartoes" onclick="go('cartoes')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h3"/></svg>Cartões</button>
  <button data-t="carros" onclick="go('carros')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16.5V12l2-5h10l2 5v4.5"/><path d="M3.5 12h17v4.5h-17z"/><circle cx="7.5" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/></svg>Carros</button>
  <button data-t="mais" onclick="go('mais')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/></svg>Mais</button>
@@ -187,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=31, APP_DATE='05/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=32, APP_DATE='05/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -433,11 +439,12 @@ function pillStatus(x,proj){
  if(x.status==='pendente'&&x.sinal>0)return '<span class="pill">previsto</span>';
  return ''}
 function acaoItem(x){switch(x.kind){
- case 'fixa':return "abrirFixaMes('"+x.id+"','"+x.ym+"')";
+ case 'fixa':return "abrirUni('fixa','"+x.id+"','"+x.ym+"')";
  case 'fatura':case 'reemb':return "abrirFatura('"+x.id+"','"+x.ym+"')";
- case 'carro':case 'multa':return "abrirSemana('carro','"+x.id+"','"+x.sem+"')";
- case 'renda':return "abrirSemana('renda','"+x.id+"','"+x.sem+"')";
- case 'avulsa':return "abrirAvulsa('"+x.id+"')";
+ case 'carro':return "abrirUni('carro','"+x.id+"','"+x.sem+"')";
+ case 'multa':return "abrirSemana('carro','"+x.id+"','"+x.sem+"')";
+ case 'renda':return "abrirUni('renda','"+x.id+"','"+x.sem+"')";
+ case 'avulsa':return "abrirUni('avulsa','"+x.id+"')";
  case 'doc':return "abrirDetCarro('"+x.id+"')";
  default:return "abrirLanc('"+x.id+"')"}}
 function linhaItem(x,proj,dep){
@@ -451,7 +458,7 @@ function linhaItem(x,proj,dep){
  var muted=(x.status==='pago'||x.status==='parado'||x.status==='cartao')&&!proj?' muted':'';
  var pl=pillStatus(x,proj),aft='';
  if(dep&&x.sinal<0&&saldoTotal()!=null)aft='<small class="'+(dep.saldo<0?'neg':'')+'">'+(dep.saldo<0?'faltam '+c2s(-dep.saldo):'sobra '+c2s(dep.saldo))+'</small>';
- return '<div class="row tap'+muted+'" onclick="'+acaoItem(x)+'"><div class="bub '+bubCls(x)+'">'+icone(x)+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div>'+(sub.length||pl?'<div class="s">'+pl+(sub.length?(pl?' ':'')+esc(sub.join(' · ')):'')+'</div>':'')+'</div><div class="v '+cls+'">'+sg+c2s(v).replace('−','')+aft+'</div></div>'}
+ return '<div class="row tap'+muted+'" onclick="'+acaoItem(x)+'">'+ckHtml(x)+'<div class="g"><div class="t">'+esc(x.titulo)+'</div>'+(sub.length||pl?'<div class="s">'+pl+(sub.length?(pl?' ':'')+esc(sub.join(' · ')):'')+'</div>':'')+'</div><div class="v '+cls+'">'+sg+c2s(v).replace('−','')+aft+'</div></div>'}
 function quando(d){var n=diffD(hoje(),d);return n===0?'hoje':n===1?'amanhã':n<0?'há '+(-n)+' dias':'em '+n+' dias'}
 function dcurto(d){return d?DS[pd(d).getDay()].slice(0,3)+' '+dbr(d):'—'}
 
@@ -486,13 +493,126 @@ function cardDecisao(o,p){var x=o.x,outras=(p.saldo==null?0:p.saldo)+o.cumIn-o.a
  var r=o.saldo;h+='<div class="res '+(r>=0?'ok':'bad')+'"><span>'+(r>=0?'Dá para pagar':'Precisa de mais')+'<small>'+(r>=0?'depois de pagar, sobra':'para cobrir, faltam')+'</small></span><span style="font-size:19px">'+c2s(Math.abs(r))+'</span></div>';
  if(r<0&&o.cumInc>0)h+='<div class="sub" style="margin-top:7px">Se as entradas incertas até lá caírem ('+c2s(o.cumInc)+'), '+(r+o.cumInc>=0?'dá e sobra '+c2s(r+o.cumInc):'ainda faltam '+c2s(-(r+o.cumInc)))+'.</div>';
  return h+'</div>'}
+/* ===== v32 (Hudson 05/11): "um jeito só" — aprovado no modelo de teste =====
+   Toda linha tem um CÍRCULO: um toque = aconteceu (recebi/paguei tudo, hoje, na conta de sempre).
+   Tocar no NOME abre sempre a MESMA folha: Valor · Já aconteceu? · Data · Conta. Pagou menos: UMA pergunta
+   ("ainda deve" ou "foi desconto"). O "+" abre um formulário só, com descrição que completa sozinha.
+   Por baixo, tudo grava nos mesmos registros de antes (semanas, contas fixas, contas avulsas, lançamentos). */
+function quickAcao(x){
+ if(!x||x.status==='pago'||x.status==='parado'||x.status==='cartao'||x.status==='adiado'||x.status==='adiantado'||!(x.resta>0))return '';
+ switch(x.kind){case 'carro':return "receberSemana('"+x.id+"','"+x.sem+"')";
+  case 'renda':return "receberRenda('"+x.id+"','"+x.sem+"')";
+  case 'fixa':return "pagarRapido('fixa','"+x.id+"','"+x.ym+"')";
+  case 'fatura':return "pagarRapido('fatura','"+x.id+"','"+x.ym+"')";
+  case 'avulsa':return "pagarRapido('avulsa','"+x.id+"','')"}
+ return ''}
+function ckHtml(x,q){if(q==null)q=quickAcao(x);
+ if(x&&x.status==='pago')return '<button class="ck on" aria-label="Ver o que foi registrado" onclick="event.stopPropagation();'+acaoItem(x)+'">✓</button>';
+ if(!q)return '<div class="bub '+bubCls(x)+'">'+icone(x)+'</div>';
+ return '<button class="ck '+(x.sinal>0?'in':'out')+'" aria-label="'+(x.sinal>0?'Recebi tudo hoje':'Paguei tudo hoje')+'" onclick="event.stopPropagation();'+q+'"></button>'}
+
+/* ---------- a folha única ---------- */
+var U=null;
+function abrirUni(kind,id,ref){if(precisaConta())return;var t=hoje(),u={kind:kind,id:id,ref:ref||'',feito:true,resto:'deve',pags:[],sinal:1,carroId:null,extra:[]};
+ if(kind==='carro'){var car=carro(id),k=contaSemana(car,ref);if(!k)return abrirSemanaCarro(id,ref);var inf=k.inf;
+  if((k.adiada&&!k.rs.length)||((inf.status==='semContrato'||inf.status==='parado'||inf.status==='adiantado')&&!k.rs.length&&k.aj.valor==null&&!k.carry))return abrirSemanaCarro(id,ref);
+  u.titulo=car.nome;u.meta=(inf.motorista?primeiroNome(inf.motorista)+' · ':'')+'semanal · vence '+dcurto(ref);u.resta=k.resta;u.pags=k.rs;u.carroId=car.id;
+  if(k.carry){var n=cadeiaSemana(car,ref).filter(function(c){return c.W!==ref}).length;u.extra.push('inclui '+c2s(k.carry)+' de '+n+' semana'+(n>1?'s':'')+' que não pagou')}
+  if(k.aj.valor!=null)u.extra.push('valor desta semana: '+c2s(k.devido)+(k.aj.motivo?' ('+esc(k.aj.motivo)+')':''));
+  if(k.multa>0)u.extra.push('inclui multa de atraso '+c2s(k.multa))}
+ else if(kind==='renda'){var o=renda(id),rs=recebSemana('renda',id,ref);u.titulo=o.nome;u.meta='semana de '+dcurto(ref);u.resta=rs.length?0:o.valor;u.pags=rs}
+ else if(kind==='fixa'){var f=fixa(id),x=fixaMes(f,ref);u.titulo=f.nome;u.sinal=-1;u.meta='conta fixa · vence '+(f.dia?dcurto(x.due):'(dia a confirmar)')+(ehCartao(f.meio)?' · no cartão':'');u.resta=x.resta;u.pags=x.pags;u.carroId=f.carro||null;
+  if(ehCartao(f.meio))return abrirFixaMes(id,ref)}
+ else if(kind==='avulsa'){var a=porId(S.avulsas,id),pg=viv(S.lanc).filter(function(l){return l.ref===id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')});u.titulo=a.desc;u.sinal=a.receber?1:-1;u.meta=(a.receber?'a receber':'a pagar')+' · '+dcurto(a.data)+(a.incerto?' · incerto':'');u.resta=Math.max(0,a.valor-soma(pg,function(l){return l.valor}));u.pags=pg;u.carroId=a.carro||null;u.dataItem=a.data}
+ u.v=u.resta;u.data=t;u.meio=S.ultConta&&conta(S.ultConta)&&!conta(S.ultConta).del?S.ultConta:contaPadrao();U=u;uniDesenha()}
+function uniDesenha(){var u=U,rec=u.sinal>0,h='<h3>'+esc(u.titulo)+'</h3><div class="sub">'+esc(u.meta)+(u.carroId&&carro(u.carroId)&&u.kind!=='carro'?' · '+esc(carro(u.carroId).nome):'')+'</div>';
+ if(u.extra.length)h+='<div class="sub" style="margin-top:4px">'+u.extra.join(' · ')+'</div>';
+ if(u.pags.length)h+='<div class="card" style="margin-top:10px"><h2>'+(rec?'Já recebido':'Já pago')+'</h2>'+u.pags.map(function(l){return '<div class="row"><div class="ck on" style="cursor:default">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm sec" style="width:auto;margin:0" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'}).join('')+'</div>';
+ if(u.resta>0){
+  h+=fMoney('uVal',u.pags.length?(rec?'Falta receber':'Falta pagar'):'Valor',u.v).replace('class="money"','class="money" style="font-size:26px;font-weight:800"')+'<div id="uAsk"></div>';
+  h+='<div class="f"><label>Já aconteceu?</label><div class="sw2"><button class="'+(u.feito?'on':'')+'" onclick="uniLer();U.feito=true;uniDesenha()">Sim, '+(rec?'recebi':'paguei')+'</button><button class="'+(!u.feito?'on':'')+'" onclick="uniLer();U.feito=false;uniDesenha()">Ainda não</button></div>'+
+   (!u.feito?'<small>'+(u.kind==='avulsa'?'Pode mudar o valor ou a data. ':'Se mudar o valor, muda só '+(u.kind==='fixa'?'neste mês':'nesta semana')+'. ')+'Não mexe no saldo.</small>':'')+'</div>';
+  if(u.feito){h+=fData('uData','Data',u.data);var cs=optContas();if(cs.length>1)h+='<div class="f"><label>'+(rec?'Caiu em':'Saiu de')+'</label><div class="chips">'+cs.map(function(c){return '<button class="'+(u.meio===c[0]?'on':'')+'" onclick="uniLer();U.meio=\''+c[0]+'\';uniDesenha()">'+esc(c[1])+'</button>'}).join('')+'</div></div>'}
+  else if(u.kind==='avulsa')h+=fData('uData','Data',u.dataItem);
+  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar</button>'}
+ else h+='<div class="alert ok" style="margin-top:10px"><i>✓</i><div>'+(rec?'Recebido':'Pago')+' por completo.</div></div>';
+ var mais=u.kind==='carro'?"abrirSemanaCarro('"+u.id+"','"+u.ref+"')":u.kind==='renda'?"abrirSemana('renda','"+u.id+"','"+u.ref+"',1)":u.kind==='fixa'?"abrirFixaMes('"+u.id+"','"+u.ref+"')":"abrirAvulsa('"+u.id+"')";
+ h+='<button class="btn sec" onclick="'+mais+'">'+(u.kind==='carro'?'Mais opções (diárias, multa, abateu manutenção)':'Mais opções')+'</button><button class="btn sec" onclick="fechar()">Fechar</button>';
+ abrir(h);var el=document.getElementById('uVal');if(el)el.addEventListener('input',uniPergunta);uniPergunta()}
+function uniLer(){var v=document.getElementById('uVal');if(v){var n=parseBRL(v.value);U.v=n==null?U.v:n}var d=document.getElementById('uData');if(d&&d.value){if(U.feito)U.data=d.value;else U.dataItem=d.value}}
+function uniPergunta(){var a=document.getElementById('uAsk');if(!a||!U)return;var n=parseBRL(val('uVal'));
+ if(U.feito&&n!=null&&n>0&&n<U.resta&&U.kind!=='renda'){var f=U.resta-n,rec=U.sinal>0;
+  a.innerHTML='<div class="alert inc" style="display:block"><b>Faltaram '+c2s(f)+'. O que é isso?</b><div class="chips" style="margin-top:8px"><button class="'+(U.resto==='deve'?'on':'')+'" onclick="U.resto=\'deve\';uniPergunta()">'+(rec?'Ainda me deve':'Ainda vou pagar o resto')+'</button><button class="'+(U.resto==='desc'?'on':'')+'" onclick="U.resto=\'desc\';uniPergunta()">'+(rec?'Foi desconto':'Ficou mais barato')+'</button></div></div>'}
+ else a.innerHTML=''}
+function uniSalvar(){uniLer();var u=U,v=parseBRL(val('uVal'));if(v==null||v<0){toast('Digite o valor');return}
+ var t=Date.now(),ids=[],semUndo=null,msg='';
+ if(u.feito){if(!(v>0)){toast('Digite quanto '+(u.sinal>0?'entrou':'saiu'));return}
+  var meio=u.meio||contaPadrao(),data=val('uData')||hoje(),falta=Math.max(0,u.resta-v),desc=falta>0&&u.resto==='desc';
+  if(u.kind==='carro'){var car=carro(u.id),k=contaSemana(car,u.ref),key=u.id+'|'+u.ref;
+   if(desc){semUndo={k:key,v:S.semanas[key]?JSON.parse(JSON.stringify(S.semanas[key])):undefined};var cut=Math.min(falta,k.devido);S.semanas[key]=Object.assign({},S.semanas[key]||{},{valor:Math.max(0,k.devido-cut),motivo:'desconto de '+c2s(cut),at:t})}
+   ids=lancaPagamento(car,u.ref,v,{abat:0,motivo:'',meio:meio,data:data,hora:data===hoje()?horaAgora():''});
+   var k2=contaSemana(car,u.ref);msg=car.nome+': '+c2s(v)+' recebido'+(k2&&k2.resta>0?' · ainda deve '+c2s(k2.resta):'')+(desc?' · desconto de '+c2s(Math.min(falta,k.devido)):'')}
+  else if(u.kind==='renda'){var l={id:uid(),tipo:'entrada',fonte:'renda',fid:u.id,semana:u.ref,valor:v,meio:meio,data:data,criado:t,at:t};S.lanc.push(l);ids=[l.id];msg=u.titulo+': '+c2s(v)+' recebido'}
+  else if(u.kind==='fixa'){var f=fixa(u.id),x=fixaMes(f,u.ref),l2={id:uid(),tipo:'pagfixa',ref:x.k,valor:v,meio:meio,data:data,criado:t,at:t};S.lanc.push(l2);ids=[l2.id];
+   if(desc)S.fixasMes[x.k]=Object.assign({},S.fixasMes[x.k]||{},{valor:x.pago+v});msg=f.nome+': '+c2s(v)+' pago'+(falta>0&&!desc?' · falta '+c2s(falta):'')}
+  else if(u.kind==='avulsa'){var a=porId(S.avulsas,u.id),pg=soma(u.pags,function(q){return q.valor}),l3={id:uid(),tipo:a.receber?'recavulsa':'pagavulsa',ref:a.id,valor:v,meio:meio,data:data,desc:a.desc,carro:a.carro||null,criado:t,at:t};S.lanc.push(l3);ids=[l3.id];
+   if(desc)editar(a,{valor:pg+v});msg=a.desc+': '+c2s(v)+(a.receber?' recebido':' pago')+(falta>0&&!desc?' · '+(a.receber?'ainda deve ':'falta ')+c2s(falta):'')}
+  if(!(conta(meio)||{}).del)S.ultConta=meio;
+  save();fechar();render();toastDesf(msg,{lanc:ids,sem:semUndo});return}
+ /* ainda não: só muda o valor (e a data da conta avulsa); não mexe no saldo */
+ var mudou=v!==u.resta;
+ if(u.kind==='carro'&&mudou){var car2=carro(u.id),kk=contaSemana(car2,u.ref),key2=u.id+'|'+u.ref;S.semanas[key2]=Object.assign({},S.semanas[key2]||{},{valor:Math.max(0,kk.devido+(v-u.resta)),motivo:'valor combinado',at:t})}
+ else if(u.kind==='fixa'&&mudou){var x2=fixaMes(fixa(u.id),u.ref);S.fixasMes[x2.k]=Object.assign({},S.fixasMes[x2.k]||{},{valor:x2.pago+v})}
+ else if(u.kind==='avulsa'){var a2=porId(S.avulsas,u.id),pg2=soma(u.pags,function(q){return q.valor}),p={};if(mudou)p.valor=pg2+v;var nd=val('uData');if(nd&&nd!==a2.data)p.data=nd;if(Object.keys(p).length)editar(a2,p)}
+ save();fechar();render();toast(mudou||u.kind==='avulsa'?'Salvo · não mexeu no saldo':'Nada mudou')}
+
+/* ---------- o "+": um formulário só ---------- */
+var NU=null;
+function novoUnico(){if(precisaConta())return;NU={tipo:'out',desc:'',valor:null,data:hoje(),feito:true,carro:'',meio:(S.ultMeio&&(conta(S.ultMeio)||cartao(S.ultMeio))&&!(conta(S.ultMeio)||cartao(S.ultMeio)).del)?S.ultMeio:contaPadrao(),parc:1,de:'eu',cat:'',catMan:false,verCats:false};nuDesenha()}
+function nuLer(){var e=document.getElementById('nuDesc');if(e)NU.desc=e.value;var v=document.getElementById('nuVal');if(v){var n=parseBRL(v.value);NU.valor=n}var d=document.getElementById('nuData');if(d&&d.value)NU.data=d.value}
+function nuSet(k,v){nuLer();NU[k]=v;if(k==='cat')NU.catMan=true;if(k==='tipo'&&v==='in'&&ehCartao(NU.meio))NU.meio=contaPadrao();nuDesenha()}
+function nuDesenha(){var n=NU,saiu=n.tipo==='out',card=saiu&&ehCartao(n.meio),fut=n.data>hoje();if(fut&&!card)n.feito=false;if(card)n.feito=true;
+ if(!n.catMan)n.cat=sugCat(n.desc)||'';
+ var h='<h3>Lançar</h3><div class="sw2" style="margin-top:6px"><button class="'+(saiu?'onr':'')+'" onclick="nuSet(\'tipo\',\'out\')">Saiu dinheiro</button><button class="'+(!saiu?'on':'')+'" onclick="nuSet(\'tipo\',\'in\')">Entrou dinheiro</button></div>';
+ h+='<div class="f"><label>O que é</label><input id="nuDesc" autocomplete="off" value="'+esc(n.desc)+'" placeholder="'+(saiu?'Ex.: mercado, gasolina, boleto':'Ex.: semanal Mobi, multa do motorista')+'" oninput="nuSugere(this.value)"><div id="nuSug"></div></div>';
+ h+=fMoney('nuVal','Valor',n.valor).replace('class="money"','class="money" style="font-size:26px;font-weight:800"');
+ h+=fData('nuData','Data',n.data).replace('type="date"','type="date" onchange="nuLer();nuDesenha()"');
+ if(!card)h+='<div class="f"><label>Já aconteceu?</label><div class="sw2"><button class="'+(n.feito?'on':'')+'" '+(fut?'disabled style="opacity:.4"':'')+' onclick="nuSet(\'feito\',true)">Sim, '+(saiu?'paguei':'recebi')+'</button><button class="'+(!n.feito?'on':'')+'" onclick="nuSet(\'feito\',false)">Ainda não</button></div>'+(!n.feito?'<small>'+(fut?'Data no futuro: f':'F')+'ica na Agenda e no Hoje até acontecer. Não mexe no saldo.</small>':'')+'</div>';
+ if(saiu){var ms=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(n.feito?viv(S.cartoes).map(function(c){return [c.id,'Cartão '+c.nome]}):[]);
+  h+='<div class="f"><label>'+(n.feito?'Pagou com':'Vai pagar com')+'</label><div class="chips">'+ms.map(function(m){return '<button class="'+(n.meio===m[0]?'on':'')+'" onclick="nuSet(\'meio\',\''+m[0]+'\')">'+esc(m[1])+'</button>'}).join('')+'</div></div>';
+  if(card)h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(q){return '<button class="'+((+n.parc||1)===q?'on':'')+'" onclick="nuSet(\'parc\','+q+')">'+(q===1?'À vista':q+'x')+'</button>'}).join('')+'<button class="'+(n.de==='pai'?'on':'')+'" onclick="nuSet(\'de\',\''+(n.de==='pai'?'eu':'pai')+'\')">É do pai</button></div></div>'}
+ else if(n.feito&&viv(S.contas).length>1)h+='<div class="f"><label>Caiu em</label><div class="chips">'+optContas().map(function(c){return '<button class="'+(n.meio===c[0]?'on':'')+'" onclick="nuSet(\'meio\',\''+c[0]+'\')">'+esc(c[1])+'</button>'}).join('')+'</div></div>';
+ h+='<div class="f"><label>Carro (opcional)</label><div class="chips"><button class="'+(!n.carro?'on':'')+'" onclick="nuSet(\'carro\',\'\')">Nenhum</button>'+carrosAtivos().map(function(c){return '<button class="'+(n.carro===c.id?'on':'')+'" onclick="nuSet(\'carro\',\''+c.id+'\')">'+esc(c.nome.split(' ')[0])+'</button>'}).join('')+'</div></div>';
+ if(saiu){var cs=catsUsadas();h+='<div class="f"><label>Categoria</label>'+(n.verCats?'<div class="chips">'+cs.map(function(c){return '<button class="'+(n.cat===c?'on':'')+'" onclick="NU.verCats=false;nuSet(\'cat\',\''+esc(c)+'\')">'+esc(c)+'</button>'}).join('')+'</div>':'<div class="nlinfo tap" onclick="nuLer();NU.verCats=true;nuDesenha()">'+(n.cat?'<b>'+esc(n.cat)+'</b>':'Escolher')+' · trocar ›</div>')+'</div>'}
+ h+='<button class="btn" style="font-size:17px;padding:15px" onclick="nuSalvar()">Salvar</button>';
+ h+='<button class="btn sec" onclick="NL=null;novoLanc(\'reembolso\')">Outro tipo: reembolso do pai, empréstimo, transferência</button><button class="btn sec" onclick="fechar()">Cancelar</button>';
+ abrir(h)}
+function nuSugere(t){var el=document.getElementById('nuSug');NU.desc=t;t=String(t||'').trim().toLowerCase();if(!el)return;if(t.length<2){el.innerHTML='';return}
+ var vis={},out=[];
+ carrosAtivos().forEach(function(c){var d='semanal '+c.nome.toLowerCase();if(d.indexOf(t)>=0||c.nome.toLowerCase().indexOf(t)>=0)out.push({k:'car',id:c.id,d:'Semanal '+c.nome,s:'receber a semana'})});
+ viv(S.lanc).slice().sort(function(a,b){return (b.criado||0)-(a.criado||0)}).forEach(function(l){if((l.tipo!=='gasto'&&l.tipo!=='entrada')||l.fonte||!l.desc)return;var k=l.desc.toLowerCase();if(vis[k]||k.indexOf(t)<0)return;vis[k]=1;out.push({k:'lanc',id:l.id,d:l.desc,s:c2s(l.valor)+(l.cat?' · '+l.cat:'')+(l.carro&&carro(l.carro)?' · '+carro(l.carro).nome.split(' ')[0]:'')})});
+ viv(S.fixas).forEach(function(f){var k=f.nome.toLowerCase();if(vis[k]||k.indexOf(t)<0)return;vis[k]=1;out.push({k:'fixa',id:f.id,d:f.nome,s:'conta fixa · '+c2s(f.valor)})});
+ out=out.slice(0,5);el.innerHTML=out.length?'<div class="nusug">'+out.map(function(o){return '<button onclick="nuUsa(\''+o.k+'\',\''+o.id+'\')">'+esc(o.d)+' <small>· '+esc(o.s)+'</small></button>'}).join('')+'</div>':''}
+function nuUsa(k,id){if(k==='car'){var t=hoje(),W=null;[addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<S.inicio)return;itensMes(ym).forEach(function(x){if(x.kind==='carro'&&x.id===id&&x.resta>0&&(x.status==='pendente'||x.status==='atrasado')&&(!W||x.sem<W))W=x.sem})});
+  if(!W){toast('Nenhuma semana em aberto desse carro');return}return abrirUni('carro',id,W)}
+ if(k==='fixa'){var f=fixa(id),ym=ymOf(hoje()),x=fixaMes(f,ym);if(x.resta>0&&!ehCartao(f.meio))return abrirUni('fixa',id,ym);NU.desc=f.nome;NU.valor=f.valor;NU.tipo='out';NU.cat=f.cat||'';NU.catMan=!!f.cat;NU.carro=f.carro||'';return nuDesenha()}
+ var l=porId(S.lanc,id);NU.desc=l.desc;NU.valor=l.valor;NU.tipo=l.tipo==='entrada'?'in':'out';NU.carro=l.carro&&carro(l.carro)?l.carro:'';if(l.cat){NU.cat=l.cat;NU.catMan=true}
+ var m=conta(l.meio)||cartao(l.meio);if(m&&!m.del&&!(NU.tipo==='in'&&ehCartao(l.meio)))NU.meio=l.meio;NU.parc=1;nuDesenha()}
+function nuSalvar(){nuLer();var n=NU,v=n.valor;if(v==null||v<=0){toast('Digite o valor');return}var desc=String(n.desc||'').trim();if(!desc){toast('Escreva o que é');return}
+ var saiu=n.tipo==='out',card=saiu&&ehCartao(n.meio),car=n.carro?carro(n.carro):null,t=Date.now(),cat=saiu?(n.cat||sugCat(desc)||'Outros'):null;
+ if(!n.feito&&!card){var av={id:uid(),criado:t,desc:desc,valor:v,data:n.data,incerto:false,cat:saiu?cat:(/multa/i.test(desc)?'Multas e débitos':'Outros'),carro:car?car.id:null,receber:!saiu,orig:saiu?null:(/multa/i.test(desc)&&car?'multa':'outra'),agendado:true};
+  S.avulsas.push(av);save();fechar();render();toast('📅 Agendado para '+dcurto(n.data)+' · não mexe no saldo');return}
+ if(!saiu&&ehCartao(n.meio))n.meio=contaPadrao();
+ var l={id:uid(),criado:t,at:t,tipo:saiu?'gasto':'entrada',valor:v,data:n.data,desc:desc,meio:n.meio,cat:cat,de:card?n.de:'eu',parc:card?(+n.parc||1):1,dest:null,ref:null,carro:car?car.id:null,orig:saiu?null:(/multa/i.test(desc)&&car?'multa':'outra')};
+ S.lanc.push(l);if(saiu)S.ultMeio=n.meio;else S.ultConta=n.meio;save();fechar();render();
+ if(card){var c=cartao(n.meio),ym=faturaDe(c,l.data);toastDesf(c.nome+': fatura de '+mesNome(ym).split(' ')[0]+(l.parc>1?' · '+l.parc+'x':''),{lanc:[l.id]})}else toastDesf((saiu?'Gasto: ':'Entrada: ')+c2s(v)+' · '+desc,{lanc:[l.id]})}
+
 /* ===== Hoje (Hudson 03/11: "o app está embaralhado" — olhar de novo com outros olhos) =====
    Só o que importa para decidir o dia: quanto tem, se o mês fecha positivo ou negativo, o que entra e o que vence
    nesta semana (com ✓ de um toque). O resto fica na Agenda (Entradas, Despesas, Resumo), Cartões e Carros. */
 function vHoje(){
  if(vazio())return '<div class="hero"><div class="lb">Bem-vindo</div><div class="val" style="font-size:28px">Seu financeiro</div><div class="det">Os dados ficam só neste iPhone. Carregue o arquivo que o Claude te mandou, ou comece do zero.</div><button class="hbtn" onclick="document.getElementById(\'arq\').click()">Carregar arquivo de dados</button></div><button class="btn sec" onclick="go(\'mais\')">Começar do zero</button>';
  var t=hoje(),fim=addD(addM(ymOf(t),1)+'-01',-1),p=projecaoAte(addD(t,14)>fim?addD(t,14):fim),h=heroMes(p,fim);
- h+='<div class="qa"><button onclick="novoLanc()"><i>🧾</i>Gasto</button><button onclick="acaoSemanal()"><i>🚗</i>Recebi</button><button onclick="AG=\'despesas\';go(\'agenda\')"><i>✅</i>Paguei</button></div>';
  var velhas=velhasHoje();
  if(velhas.length)h+='<div class="card"><h2>Ficou de '+mesNome(ymOf(velhas[0].x.dataOrig)).split(' ')[0]+' sem marcar</h2><div class="sub" style="margin:-4px 0 6px">Já pagou? Toque em ✓ (não mexe no saldo).</div>'+
   velhas.map(function(o){var x=o.x;return '<div class="row tap" onclick="'+acaoItem(x)+'"><div class="bub out">'+icone(x)+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">venceu '+dlab(x.dataOrig)+'</div></div><div class="v">'+c2s(x.resta)+'</div><button class="okb" aria-label="Já paguei" onclick="event.stopPropagation();pagarRapido(\''+(x.kind==='avulsa'?'avulsa':x.kind)+'\',\''+x.id+'\',\''+(x.ym||'')+'\',1)">✓</button></div>'}).join('')+(velhas.length>2?'<button class="btn sec" style="margin-top:10px" onclick="pagarVelhas()">✓ Já paguei todas ('+velhas.length+')</button>':'')+'</div>';
@@ -524,8 +644,8 @@ function proximoAperto(){var p=projecao(90);if(p.saldo==null)return '';var os=p.
 function blocoPagar7(p,velhas){var t=hoje(),lim=addD(t,14),os=p.outs.filter(function(o){return o.x.resta>0&&o.data<=lim&&velhas.indexOf(o)<0&&!(o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t))});
  if(!os.length)return '';
  return '<div class="card"><h2>Para pagar · próximos 14 dias</h2>'+os.map(function(o){var x=o.x,k=x.kind==='avulsa'?'avulsa':x.kind,pode=k==='fixa'||k==='fatura'||k==='avulsa';
-  return '<div class="row tap" onclick="'+acaoItem(x)+'"><div class="bub '+bubCls(x)+'">'+icone(x)+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+(x.atrasado?'<span class="neg">venceu '+dcurto(x.dataOrig)+'</span>':dcurto(o.data))+(p.saldo!=null&&o.saldo<0?' · <span class="neg">falta dinheiro</span>':'')+'</div></div><div class="v">'+c2s(x.resta)+'</div>'+(pode?'<button class="okb" aria-label="Paguei" onclick="event.stopPropagation();pagarRapido(\''+k+'\',\''+x.id+'\',\''+(x.ym||'')+'\')">✓</button>':'')+'</div>'}).join('')+
-  '<div class="sub" style="margin-top:6px">✓ = paguei hoje o valor todo.</div></div>'}
+  return '<div class="row tap" onclick="'+acaoItem(x)+'">'+ckHtml(x,pode?"pagarRapido('"+k+"','"+x.id+"','"+(x.ym||'')+"')":'')+'<div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+(x.atrasado?'<span class="neg">venceu '+dcurto(x.dataOrig)+'</span>':dcurto(o.data))+(p.saldo!=null&&o.saldo<0?' · <span class="neg">falta dinheiro</span>':'')+'</div></div><div class="v">'+c2s(x.resta)+'</div></div>'}).join('')+
+  '<div class="sub" style="margin-top:6px">Círculo = paguei tudo hoje. Toque no nome para outro valor, data ou conta.</div></div>'}
 /* Hoje: visão do mês — entradas, despesas e cartões (Hudson 03/11, inspirado no Minhas Finanças) */
 function visaoMes(){var ym=ymOf(hoje()),it=itensMes(ym);
  var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)});
@@ -540,22 +660,26 @@ function visaoMes(){var ym=ymOf(hoje()),it=itensMes(ym);
    (multa de motorista, Pix combinado…) TODAS as pendentes, até as incertas — porque é você que tem que cobrar. */
 function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
  [addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<S.inicio)return;itensMes(ym).forEach(function(x){
-  if((x.kind==='carro'&&carro(x.id)&&!excluidoEm(carro(x.id)))||x.kind==='renda'){var tot=x.resta+((x.multaInfo&&x.multaInfo.restaMulta)||0);if(tot>0&&(x.status==='pendente'||x.status==='atrasado')&&x.data<=lim&&x.data>=addD(t,-7))its.push({x:x,tot:tot,data:x.data})}})});
+  if((x.kind==='carro'&&carro(x.id)&&!excluidoEm(carro(x.id)))||x.kind==='renda'){var tot=x.resta+((x.multaInfo&&x.multaInfo.restaMulta)||0);if(tot>0&&(x.status==='pendente'||x.status==='atrasado')&&x.data<=lim&&(x.data>=addD(t,-7)||(x.status==='atrasado'&&ymOf(x.data)===ymOf(t))))its.push({x:x,tot:tot,data:x.data})}})});
  viv(S.avulsas).forEach(function(a){if(!a.receber)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&l.tipo==='recavulsa'}),function(l){return l.valor}),r=a.valor-pg;if(r>0&&a.data<=addD(t,60))its.push({av:a,tot:r,data:a.data})});
  if(!its.length)return '';its.sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:0});
  function linha(o){
   if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'');
-   return '<div class="row tap" onclick="abrirAvulsa(\''+a.id+'\')"><div class="bub in">📥</div><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div><button class="okb" aria-label="Recebi" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')">✓</button></div>'}
+   return '<div class="row tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
   var x=o.x,m=x.multaInfo,mot=x.motorista?primeiroNome(x.motorista):'';
   var sub=(x.data<t?'<span class="neg">atrasado · era '+dcurto(x.data)+'</span>':x.data===t?'hoje':dcurto(x.data))+(mot?' · '+esc(mot):'')+(m&&m.restaMulta>0?' · com multa '+c2s(m.restaMulta):'')+(x.parcial?' · falta parte':'')+(m&&m.aj&&m.aj.valor!=null&&m.aj.motivo?' · '+esc(m.aj.motivo):'')+(m&&m.carry?(function(){var n=cadeiaSemana(carro(x.id),x.sem).filter(function(c){return c.W!==x.sem}).length;return ' · <b class="warnc">+'+n+' semana'+(n>1?'s':'')+' atrás</b>'})():'');
-  return '<div class="row tap" onclick="'+acaoItem(x)+'"><div class="bub in">'+(x.kind==='carro'?'🚗':'💵')+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div><button class="okb" aria-label="Recebi" onclick="event.stopPropagation();'+(x.kind==='carro'?"receberSemana('"+x.id+"','"+x.sem+"')":"receberRenda('"+x.id+"','"+x.sem+"')")+'">✓</button></div>'}
+  return '<div class="row tap" onclick="'+acaoItem(x)+'"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();'+(x.kind==='carro'?"receberSemana('"+x.id+"','"+x.sem+"')":"receberRenda('"+x.id+"','"+x.sem+"')")+'"></button><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
+ /* atrasados do mesmo carro/pessoa ficam juntos: "Igor · Onix deve R$ X (N semanas)" — toque abre semana a semana */
+ function grupos(l){var g={},ord=[],h='';l.forEach(function(o){var k=o.x?(o.x.kind+'|'+o.x.id):'av|'+o.av.id;if(!g[k]){g[k]=[];ord.push(k)}g[k].push(o)});
+  ord.forEach(function(k){var it=g[k];if(it.length<2){h+=linha(it[0]);return}var x=it[0].x,nm=(x.motorista?primeiroNome(x.motorista)+' · ':'')+x.titulo;
+   h+='<div class="grpc"><div class="gh" onclick="var s=this.nextElementSibling;s.hidden=!s.hidden"><div class="av">'+esc((x.motorista||x.titulo).charAt(0).toUpperCase())+'</div><div class="g"><div class="t">'+esc(nm)+'</div><div class="s"><span class="neg">deve '+it.length+' semanas · desde '+dcurto(it[0].data)+'</span> · toque para ver</div></div><div class="v pos">'+c2s(tot(it))+'</div></div><div class="gs" hidden>'+it.map(linha).join('')+'</div></div>'});return h}
  var cob=its.filter(function(o){return o.data<t||(o.x&&o.x.status==='atrasado')}),prox=its.filter(function(o){return cob.indexOf(o)<0&&o.data<=lim}),dep=its.filter(function(o){return cob.indexOf(o)<0&&o.data>lim});
  function tot(l){return soma(l,function(o){return o.tot})}
  var h='<div class="card"><h2>Para receber e cobrar</h2>';
- if(cob.length)h+='<div class="sub" style="margin:2px 0 2px"><b class="neg">Cobrar — já passou da data</b> · '+c2s(tot(cob))+'</div>'+cob.map(linha).join('');
+ if(cob.length)h+='<div class="sub" style="margin:2px 0 2px"><b class="neg">Cobrar — já passou da data</b> · '+c2s(tot(cob))+'</div>'+grupos(cob);
  if(prox.length)h+='<div class="sub" style="margin:'+(cob.length?'12px':'2px')+' 0 2px"><b>Hoje e próximos 7 dias</b> · '+c2s(tot(prox))+'</div>'+prox.map(linha).join('');
  if(dep.length)h+='<div class="sub" style="margin:12px 0 2px"><b>Mais adiante</b> · '+c2s(tot(dep))+'</div>'+dep.map(linha).join('');
- return h+'<div class="sub" style="margin-top:6px">✓ = recebi tudo hoje. Valor diferente, desconto ou outra data: toque na linha.</div></div>'}
+ return h+'<div class="sub" style="margin-top:6px">Círculo = recebi tudo hoje. Pagou parte, desconto ou outro dia: toque no nome.</div></div>'}
 /* ===== Agenda: Tudo · Entradas · Despesas (Hudson 03/11: "visualizar o que são as entradas do mês e as despesas do mês") ===== */
 function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas'],['resumo','Resumo']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
 /* lista agrupada por dia, com a data em cima de cada grupo (igual à Agenda) */
@@ -1082,32 +1206,42 @@ function salvarSemana(kind,id,sem){var v=dinheiro('sVal',false);if(v==null||v<0)
 function contaPadrao(){var cs=viv(S.contas);if(!cs.length)return '';var u=S.ultConta&&conta(S.ultConta);return (u&&!u.del)?u.id:cs[0].id}
 function diariaDe(v){return Math.ceil((v||0)/700)*100}
 function abrirSemanaCarro(id,sem,lid,form){if(precisaConta())return;var car=carro(id),k=contaSemana(car,sem);if(!k){toast('Este carro não tem semanal');return}var inf=k.inf,qui=addD(sem,-6),ed=lid?porId(S.lanc,lid):null;
- var h='<h3>'+esc(car.nome)+'</h3><div class="sub">Semana '+dsem(qui).slice(0,3)+' '+dbr(qui)+' → '+dsem(sem).slice(0,3)+' '+dbr(sem)+(inf.motorista?' · '+esc(primeiroNome(inf.motorista)):'')+'</div>';
+ var h='<h3>'+esc(car.nome)+'</h3><div class="sub">'+(inf.motorista?esc(primeiroNome(inf.motorista))+' · ':'')+'vence '+dsem(sem)+' '+dbr(sem)+' <span style="opacity:.7">(semana de '+dcurto(qui)+' a '+dcurto(sem)+')</span></div>';
  if(k.adiada&&!k.rs.length)return abrir(h+'<div class="alert inc" style="margin-top:10px"><i>↪️</i><div>Não pagou esta semana: '+c2s(k.devido+k.carry)+' passou para a semana de <b>'+dsem(k.adiada).slice(0,3)+' '+dbr(k.adiada)+'</b> e é cobrado lá, junto.</div></div><button class="btn" onclick="filho(\'abrirSemanaCarro\',\''+id+'\',\''+sem+'\');abrirSemanaCarro(\''+id+'\',\''+k.adiada+'\')">Abrir a semana de '+dcurto(k.adiada)+'</button><button class="btn sec" onclick="passarSemana(\''+id+'\',\''+sem+'\',0)">Desfazer: voltar para esta semana</button><button class="btn sec" onclick="fechar()">Fechar</button>');
  if(inf.status==='semContrato'&&!k.rs.length&&k.aj.valor==null&&!k.carry)return abrir(h+'<div class="alert inf" style="margin-top:10px"><i>📄</i><div>Sem contrato no Gestão nesta semana, então não há semanal.</div></div><button class="btn sec" onclick="semOutroValor(\''+id+'\',\''+sem+'\')">Cobrar um valor mesmo assim</button><div id="sOutro"></div><button class="btn sec" onclick="fechar()">Fechar</button>');
  if(inf.status==='parado'&&inf.oficina&&!k.rs.length&&k.aj.valor==null&&!k.carry)return abrir(h+'<div class="alert inf" style="margin-top:10px"><i>🔧</i><div>Na oficina desde '+dcurto(inf.oficina)+' (Gestão): por isso o app não cobra esta semana.</div></div><button class="btn" onclick="cobrarNaOficina(\''+id+'\',\''+sem+'\',1)">O motorista bateu: a semana continua contando</button><button class="btn sec" onclick="semOutroValor(\''+id+'\',\''+sem+'\')">Cobrar outro valor só nesta semana</button><div id="sOutro"></div><button class="btn sec" onclick="fechar()">Fechar</button>');
  if(inf.status==='adiantado'&&!k.rs.length&&k.aj.valor==null&&!k.carry)return abrir(h+'<div class="alert ok" style="margin-top:10px"><i>✅</i><div>'+esc(inf.nota)+'.</div></div><button class="btn sec" onclick="fechar()">Fechar</button>');
  var base=k.normal||inf.contrato||0,dia=diariaDe(inf.contrato||base),nDia=k.aj.valor!=null&&dia?Math.round((base-k.aj.valor)/dia):0,ajDia=k.aj.valor!=null&&nDia>0&&base-nDia*dia===k.aj.valor;
- /* valor da semana + atalhos */
- h+='<div class="card" style="margin-top:10px"><div class="kv"><span>Valor da semana</span><b style="font-size:19px">'+c2s(k.devido)+'</b></div>'+
-  '<div class="sub" style="margin:-2px 0 8px">'+(k.aj.valor!=null?(k.aj.motivo?esc(k.aj.motivo)+' · ':'')+'contrato '+c2s(base):(inf.nota?esc(inf.nota):'pelo contrato'))+(dia?' · diária '+c2s(dia):'')+(car.cobraOficina&&inf.nota&&/oficina/.test(inf.nota)?' · <a style="color:var(--acc);font-weight:650" onclick="cobrarNaOficina(\''+id+'\',\''+sem+'\',0)">parar de cobrar</a>':'')+'</div>'+
-  (dia?'<div class="chips" style="margin-bottom:4px">'+[1,2,3].map(function(n){return '<button class="'+(ajDia&&nDia===n?'on':'')+'" onclick="semDiarias(\''+id+'\',\''+sem+'\','+n+')">− '+n+' diária'+(n>1?'s':'')+'</button>'}).join('')+'<button onclick="semOutroValor(\''+id+'\',\''+sem+'\')">Outro valor</button>'+(k.aj.valor!=null?'<button onclick="semDiarias(\''+id+'\',\''+sem+'\',0)">Voltar ao contrato</button>':'')+'</div>':'')+'<div id="sOutro"></div>';
- if((k.dias>0&&k.devido>0&&!k.adiada)||k.multa>0||k.aj.multa==='cobrar')h+='<div class="hr"></div><div class="kv"><span>Multa de atraso'+(k.multa>0?' · '+k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md):'')+'</span><b class="'+(k.multa>0?'warnc':'')+'">'+(k.multa>0?c2s(k.multa):'não cobrada')+'</b></div>'+(k.multa>0?'':'<div class="sub" style="margin:-2px 0 6px">Só entra se você tocar em Cobrar multa'+(k.dias>0&&k.md>0?' ('+k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md)+' = '+c2s(k.dias*k.md)+')':'')+'.</div>')+'<div class="chips"><button class="'+(k.aj.multa==='cobrar'?'on':'')+'" onclick="multaSemana(\''+id+'\',\''+sem+'\',\'cobrar\')">Cobrar multa</button><button class="'+(k.aj.multa!=='cobrar'?'on':'')+'" onclick="multaSemana(\''+id+'\',\''+sem+'\',\'perdoar\')">Não cobrar</button></div>';
- if(k.rs.length)h+='<div class="hr"></div>'+k.rs.map(function(l){return '<div class="row tap" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',\''+l.id+'\')"><div class="bub in">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+(l.motivo?' · '+esc(l.motivo):'')+'</div></div><div class="v sub">editar ›</div></div>'}).join('');
- if(k.carry)h+='<div class="hr"></div>'+cadeiaSemana(car,sem).filter(function(c){return c.W!==sem}).map(function(c){return '<div class="kv"><span>Semana de '+dcurto(c.W)+' (não pagou)</span><b class="warnc">'+c2s(c.v)+'</b></div>'}).join('');
- h+='<div class="hr"></div><div class="kv"><span><b style="color:var(--tx)">'+(k.resta>0?'Falta receber'+(k.carry?' (tudo)':''):'Semana paga')+'</b></span><b class="'+(k.resta>0?'neg':'pos')+'" style="font-size:19px">'+(k.resta>0?c2s(k.resta):'✓')+'</b></div></div>';
+ /* Hudson 05/11: tela da semana reorganizada — 1) quanto tem para receber e de onde vem; 2) "O que aconteceu?" com
+    3 respostas (pagou tudo / pagou parte / não pagou); 3) mudar o valor da semana fica guardado embaixo. */
+ var prox=addD(sem,7),cad=k.carry?cadeiaSemana(car,sem).filter(function(c){return c.W!==sem}):[],linhas=[];
+ linhas.push(['Semana de '+dcurto(sem)+(k.aj.valor!=null?' · '+(k.aj.motivo?esc(k.aj.motivo):'valor combinado'):''),c2s(k.devido)]);
+ cad.forEach(function(c){linhas.push(['Semana de '+dcurto(c.W)+' · <span class="warnc">não pagou</span>',c2s(c.v)])});
+ if(k.multa>0)linhas.push(['Multa de atraso ('+k.dias+' dia'+(k.dias>1?'s':'')+')',c2s(k.multa)]);
+ if(k.pago>0)linhas.push(['Já recebido','−'+c2s(k.pago)]);
+ h+='<div class="card" style="margin-top:10px"><div class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;font-size:11.5px">'+(k.resta>0?'Falta receber':'Situação')+'</div><div style="font-size:30px;font-weight:800;margin:2px 0 6px" class="'+(k.resta>0?'':'pos')+'">'+(k.resta>0?c2s(k.resta):'✓ Semana paga')+'</div>'+
+  (linhas.length>1||k.aj.valor!=null?linhas.map(function(r){return '<div class="kv sub" style="padding:3px 0"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>'}).join(''):'<div class="sub">'+(inf.nota?esc(inf.nota):'pelo contrato')+'</div>')+'</div>';
  if(k.devido>0&&k.cobra&&k.multa===0&&k.resta>0&&agoraMom()<=sem+'T12:00')h+='<div class="sub" style="margin:-4px 2px 8px">Vence '+dsem(sem)+' '+dbr(sem)+' às 12h. Depois disso entra multa de '+c2s(k.md)+' por dia (até domingo).</div>';
- /* ação principal: um toque */
- if(k.resta>0&&!ed){h+='<button class="btn" style="font-size:17px;padding:16px" onclick="receberSemana(\''+id+'\',\''+sem+'\')">✓ Recebi '+c2s(k.resta)+'</button>';
-  if(k.restaMulta>0&&k.restaSem>0)h+='<button class="btn sec" onclick="receberSemana(\''+id+'\',\''+sem+'\',1)">Recebi só o semanal ('+c2s(k.restaSem+k.carry)+') e não cobro a multa</button>'}
- if(k.resta>0&&!ed)h+='<button class="btn sec" onclick="passarSemana(\''+id+'\',\''+sem+'\',1)">Não pagou: passar '+c2s(k.resta)+' para '+dsem(addD(sem,7)).slice(0,3)+' '+dbr(addD(sem,7)).slice(0,5)+'</button>';
  var abreForm=!!(ed||form);
- if(!abreForm)h+='<button class="btn sec" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',null,1)">'+(k.resta>0?'Recebi outro valor / abateu manutenção':'Registrar outro pagamento')+'</button>';
- else{var sug=ed?ed.valor:k.resta;
-  h+='<h2 style="margin-top:12px">'+(ed?'Editar pagamento':'Registrar pagamento')+'</h2>'+fMoney('sVal','Quanto entrou',sug,ed?'':'Pode ser só uma parte: o que faltar continua em aberto.')+
-   fMoney('sAb','Abatido por manutenção',ed?ed.abat:null,'Manutenção que o motorista pagou e descontou da semana.')+fTxt('sMot','Motivo (opcional)',ed?ed.motivo:'','Ex.: troca de pastilha')+
+ if(k.resta>0&&!abreForm){
+  h+='<h2 style="margin:14px 2px 6px">O que aconteceu?</h2>';
+  h+='<button class="btn" style="font-size:17px;padding:16px" onclick="receberSemana(\''+id+'\',\''+sem+'\')">✓ Pagou tudo · '+c2s(k.resta)+'</button>';
+  if(k.restaMulta>0&&k.restaSem>0)h+='<button class="btn sec" onclick="receberSemana(\''+id+'\',\''+sem+'\',1)">Pagou tudo, mas sem a multa · '+c2s(k.restaSem+k.carry)+'</button>';
+  h+='<button class="btn sec" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',null,1)">💵 Pagou só uma parte</button>';
+  h+='<button class="btn sec" onclick="passarSemana(\''+id+'\',\''+sem+'\',1)">↪️ Não pagou · passar '+c2s(k.resta)+' para '+dcurto(prox)+'</button>'}
+ if(k.rs.length)h+='<div class="card"><h2>Já recebido nesta semana</h2>'+k.rs.map(function(l){return '<div class="row tap" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',\''+l.id+'\')"><div class="bub in">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+(l.motivo?' · '+esc(l.motivo):'')+'</div></div><div class="v sub">editar ›</div></div>'}).join('')+(k.resta<=0&&!abreForm?'<button class="btn sm sec" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\',null,1)">Registrar outro pagamento</button>':'')+'</div>';
+ if(abreForm){var sug=ed?ed.valor:k.resta;
+  h+='<div class="card"><h2>'+(ed?'Editar pagamento':'Quanto ele pagou?')+'</h2>'+fMoney('sVal','Quanto entrou',ed?ed.valor:null,ed?'':'O que faltar ('+c2s(k.resta)+' menos isso) continua em aberto nesta semana.')+
    fSel('sConta','Caiu na conta',optContas(),ed?ed.meio:contaPadrao())+'<div class="two">'+fData('sData','Data',ed?ed.data:hoje())+'<div class="f"><label>Hora</label><input type="time" id="sHora" value="'+esc(ed?(ed.hora||''):horaAgora())+'"></div></div>'+
-   '<button class="btn" onclick="salvarPagSemana(\''+id+'\',\''+sem+'\','+(ed?"'"+ed.id+"'":'null')+')">'+(ed?'Salvar alteração':'Registrar')+'</button>'+(ed?'<button class="btn red" onclick="desfazer(\''+ed.id+'\')">Apagar este pagamento</button>':'')}
+   maisOpcoes(fMoney('sAb','Abatido por manutenção',ed?ed.abat:null,'Manutenção que o motorista pagou e descontou da semana.')+fTxt('sMot','Motivo (opcional)',ed?ed.motivo:'','Ex.: troca de pastilha'),(ed&&(ed.abat||ed.motivo))?'Abatimento e motivo':'Abateu manutenção? / motivo')+
+   '<button class="btn" onclick="salvarPagSemana(\''+id+'\',\''+sem+'\','+(ed?"'"+ed.id+"'":'null')+')">'+(ed?'Salvar alteração':'Registrar')+'</button>'+(ed?'<button class="btn red" onclick="desfazer(\''+ed.id+'\')">Apagar este pagamento</button>':'')+'<button class="btn sec" onclick="abrirSemanaCarro(\''+id+'\',\''+sem+'\')">Voltar</button></div>'}
+ /* mudar o valor da semana (diárias, outro valor, multa) — guardado embaixo */
+ if(!abreForm){var aj='';
+  if(dia||true)aj+='<div class="sub" style="margin:2px 0 6px">Pelo contrato: '+c2s(base)+(dia?' · diária '+c2s(dia):'')+'. Carro parado, folga ou acordo? Desconte aqui — só muda esta semana.</div><div class="chips" style="margin-bottom:4px">'+(dia?[1,2,3].map(function(n){return '<button class="'+(ajDia&&nDia===n?'on':'')+'" onclick="semDiarias(\''+id+'\',\''+sem+'\','+n+')">− '+n+' diária'+(n>1?'s':'')+'</button>'}).join(''):'')+'<button onclick="semOutroValor(\''+id+'\',\''+sem+'\')">Outro valor</button>'+(k.aj.valor!=null?'<button onclick="semDiarias(\''+id+'\',\''+sem+'\',0)">Voltar ao contrato</button>':'')+'</div><div id="sOutro"></div>';
+  if(car.cobraOficina&&inf.nota&&/oficina/.test(inf.nota))aj+='<div class="sub" style="margin-top:6px">Na oficina, mas contando: <a style="color:var(--acc);font-weight:650" onclick="cobrarNaOficina(\''+id+'\',\''+sem+'\',0)">parar de cobrar</a></div>';
+  if((k.dias>0&&k.devido>0&&!k.adiada)||k.multa>0||k.aj.multa==='cobrar')aj+='<div class="hr"></div><div class="kv"><span>Multa de atraso'+(k.dias>0&&k.md>0?' · '+k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md):'')+'</span><b class="'+(k.multa>0?'warnc':'')+'">'+(k.multa>0?c2s(k.multa):'não cobrada')+'</b></div><div class="chips"><button class="'+(k.aj.multa==='cobrar'?'on':'')+'" onclick="multaSemana(\''+id+'\',\''+sem+'\',\'cobrar\')">Cobrar multa</button><button class="'+(k.aj.multa!=='cobrar'?'on':'')+'" onclick="multaSemana(\''+id+'\',\''+sem+'\',\'perdoar\')">Não cobrar</button></div>';
+  var aberto=k.aj.valor!=null||k.aj.multa==='cobrar';
+  h+=aberto?'<div class="card"><h2>Valor desta semana</h2>'+aj+'</div>':maisOpcoes('<div class="card"><h2>Valor desta semana</h2>'+aj+'</div>','Mudar o valor desta semana (diárias, desconto, multa)')}
  abrir(h+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
 function cobrarNaOficina(id,sem,on){var car=carro(id),g=extCarro(car),of=g&&_iso(g.oficinaDesde);editar(car,{cobraOficina:on?(of||'atual'):null});save();render();abrirSemanaCarro(id,sem);toast(on?car.nome+': semanas continuam contando enquanto estiver na oficina':car.nome+': na oficina não cobra')}
 function receberSemana(id,sem,soSemanal){var car=carro(id),k=contaSemana(car,sem),c=contaPadrao();if(!k||k.resta<=0||!c)return;
@@ -1122,7 +1256,7 @@ function semOutroValor(id,sem){var el=document.getElementById('sOutro');if(!el)r
 function salvarPagSemana(id,sem,lid){var v=dinheiro('sVal',false),ab=parseBRL(val('sAb'))||0;if(v==null)v=0;if(v<0||ab<0){toast('Valor não pode ser negativo');return}if(v===0&&ab===0){toast('Informe quanto entrou ou quanto foi abatido');return}
  var p={valor:v,abat:ab,motivo:val('sMot').trim(),meio:val('sConta'),data:val('sData')||hoje(),hora:val('sHora')||''};S.ultConta=p.meio;var l=lid?porId(S.lanc,lid):null;
  if(l)editar(l,p);else lancaPagamento(carro(id),sem,v,p);
- save();var k=contaSemana(carro(id),sem);fechar();render();toast(k&&k.resta>0?'Salvo · ainda falta '+c2s(k.resta):'Salvo · semana paga')}
+ save();var k=contaSemana(carro(id),sem);render();if(k&&k.resta>0){abrirSemanaCarro(id,sem);toast('Registrado · ainda falta '+c2s(k.resta))}else{fechar();toast('Registrado · semana paga')}}
 function multaSemana(id,sem,modo){var key=id+'|'+sem,o=S.semanas[key]||{};o=Object.assign({},o,{multa:modo==='cobrar'?'cobrar':null,at:Date.now()});if(!o.multa)delete o.multa;S.semanas[key]=o;save();render();abrirSemanaCarro(id,sem);toast(modo==='cobrar'?'Multa cobrada nesta semana':'Multa desta semana não será cobrada')}
 function ajusteSemana(id,sem){var k=contaSemana(carro(id),sem);
  abrir('<h3>Valor desta semana</h3><div class="sub">'+esc(carro(id).nome)+' · '+dlab(sem)+(k&&k.normal?' · pelo contrato: '+c2s(k.normal):'')+'</div>'+fMoney('ajVal','Cobrar nesta semana',k?k.devido:null,'Ex.: acordo, diária a menos, semana de folga. Só muda esta semana.')+
