@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=33, APP_DATE='05/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=34, APP_DATE='06/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -527,22 +527,26 @@ function abrirUni(kind,id,ref){if(precisaConta())return;var t=hoje(),u={kind:kin
  u.v=u.resta;u.data=t;u.meio=S.ultConta&&conta(S.ultConta)&&!conta(S.ultConta).del?S.ultConta:contaPadrao();U=u;uniDesenha()}
 function uniDesenha(){var u=U,rec=u.sinal>0,h='<h3>'+esc(u.titulo)+'</h3><div class="sub">'+esc(u.meta)+(u.carroId&&carro(u.carroId)&&u.kind!=='carro'?' · '+esc(carro(u.carroId).nome):'')+'</div>';
  if(u.extra.length)h+='<div class="sub" style="margin-top:4px">'+u.extra.join(' · ')+'</div>';
+ var _pg=soma(u.pags,function(l){return l.valor});
+ if(_pg>0&&u.resta>0)h+='<div class="card" style="margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:4px"><div><div class="sub">Total</div><b>'+c2s(_pg+u.resta)+'</b></div><div><div class="sub">'+(rec?'Recebido':'Pago')+'</div><b class="pos">'+c2s(_pg)+'</b></div><div><div class="sub">Falta</div><b class="neg">'+c2s(u.resta)+'</b></div></div>';
  if(u.pags.length)h+='<div class="card" style="margin-top:10px"><h2>'+(rec?'Já recebido':'Já pago')+'</h2>'+u.pags.map(function(l){return '<div class="row"><div class="ck on" style="cursor:default">✓</div><div class="g"><div class="t">'+c2s(l.valor)+(l.abat?' + '+c2s(l.abat)+' abatido':'')+'</div><div class="s">'+dlab(l.data)+(l.hora?' '+esc(l.hora):'')+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm sec" style="width:auto;margin:0" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'}).join('')+'</div>';
  if(u.resta>0){
-  h+=fMoney('uVal',u.pags.length?(rec?'Falta receber':'Falta pagar'):'Valor',u.v).replace('class="money"','class="money" style="font-size:26px;font-weight:800"')+'<div id="uAsk"></div>';
+  h+=fMoney('uVal',u.feito&&u.kind!=='renda'?(rec?'Quanto recebeu':'Quanto pagou')+(u.pags.length?' agora':'')+' <span style="font-weight:500;color:var(--tx2)">· '+(u.pags.length?'falta ':'total ')+c2s(u.resta)+'</span>':u.pags.length?(rec?'Falta receber':'Falta pagar'):'Valor',u.v).replace('class="money"','class="money" style="font-size:26px;font-weight:800"')+(u.feito&&u.kind!=='renda'?'<small style="display:block;margin:-4px 2px 10px;font-size:12.5px;color:var(--tx2)">'+(rec?'Recebeu só uma parte? Digite quanto entrou.':'Pagou só uma parte? Digite quanto saiu.')+'</small>':'')+'<div id="uAsk"></div>';
   h+='<div class="f"><label>Já aconteceu?</label><div class="sw2"><button class="'+(u.feito?'on':'')+'" onclick="uniLer();U.feito=true;uniDesenha()">Sim, '+(rec?'recebi':'paguei')+'</button><button class="'+(!u.feito?'on':'')+'" onclick="uniLer();U.feito=false;uniDesenha()">Ainda não</button></div>'+
-   (!u.feito?'<small>'+(u.kind==='avulsa'?'Pode mudar o valor ou a data. ':'Se mudar o valor, muda só '+(u.kind==='fixa'?'neste mês':'nesta semana')+'. ')+'Não mexe no saldo.</small>':'')+'</div>';
-  if(u.feito){h+=fData('uData','Data',u.data);var cs=optContas();if(cs.length>1)h+='<div class="f"><label>'+(rec?'Caiu em':'Saiu de')+'</label><div class="chips">'+cs.map(function(c){return '<button class="'+(u.meio===c[0]?'on':'')+'" onclick="uniLer();U.meio=\''+c[0]+'\';uniDesenha()">'+esc(c[1])+'</button>'}).join('')+'</div></div>'}
-  else if(u.kind==='avulsa')h+=fData('uData','Data',u.dataItem);
+   (u.feito&&u.kind==='avulsa'?'<small>Só quer mudar a data ou o valor? Toque em <b>Ainda não</b>.</small>':'')+(!u.feito?'<small>'+(u.kind==='avulsa'?'Pode mudar o valor ou a data. ':'Se mudar o valor, muda só '+(u.kind==='fixa'?'neste mês':'nesta semana')+'. ')+'Não mexe no saldo.</small>':'')+'</div>';
+  if(u.feito){h+=fData('uData',rec?'Recebi em':'Paguei em',u.data);var cs=optContas();if(cs.length>1)h+='<div class="f"><label>'+(rec?'Caiu em':'Saiu de')+'</label><div class="chips">'+cs.map(function(c){return '<button class="'+(u.meio===c[0]?'on':'')+'" onclick="uniLer();U.meio=\''+c[0]+'\';uniDesenha()">'+esc(c[1])+'</button>'}).join('')+'</div></div>'}
+  else if(u.kind==='avulsa')h+=fData('uData',rec?'Data combinada para receber':'Data para pagar',u.dataItem);
   h+='<button class="btn" style="font-size:17px;padding:15px" onclick="uniSalvar()">Salvar</button>'}
  else h+='<div class="alert ok" style="margin-top:10px"><i>✓</i><div>'+(rec?'Recebido':'Pago')+' por completo.</div></div>';
  var mais=u.kind==='carro'?"abrirSemanaCarro('"+u.id+"','"+u.ref+"')":u.kind==='renda'?"abrirSemana('renda','"+u.id+"','"+u.ref+"',1)":u.kind==='fixa'?"abrirFixaMes('"+u.id+"','"+u.ref+"')":"abrirAvulsa('"+u.id+"')";
- h+='<button class="btn sec" onclick="'+mais+'">'+(u.kind==='carro'?'Mais opções (diárias, multa, abateu manutenção)':'Mais opções')+'</button><button class="btn sec" onclick="fechar()">Fechar</button>';
+ h+='<button class="btn sec" onclick="'+mais+'">'+(u.kind==='carro'?'Mais opções (diárias, multa, abateu manutenção)':u.kind==='avulsa'?'Editar nome, total ou apagar':'Mais opções')+'</button><button class="btn sec" onclick="fechar()">Fechar</button>';
  abrir(h);var el=document.getElementById('uVal');if(el)el.addEventListener('input',uniPergunta);uniPergunta()}
 function uniLer(){var v=document.getElementById('uVal');if(v){var n=parseBRL(v.value);U.v=n==null?U.v:n}var d=document.getElementById('uData');if(d&&d.value){if(U.feito)U.data=d.value;else U.dataItem=d.value}}
 function uniPergunta(){var a=document.getElementById('uAsk');if(!a||!U)return;var n=parseBRL(val('uVal'));
  if(U.feito&&n!=null&&n>0&&n<U.resta&&U.kind!=='renda'){var f=U.resta-n,rec=U.sinal>0;
-  a.innerHTML='<div class="alert inc" style="display:block"><b>Faltaram '+c2s(f)+'. O que é isso?</b><div class="chips" style="margin-top:8px"><button class="'+(U.resto==='deve'?'on':'')+'" onclick="U.resto=\'deve\';uniPergunta()">'+(rec?'Ainda me deve':'Ainda vou pagar o resto')+'</button><button class="'+(U.resto==='desc'?'on':'')+'" onclick="U.resto=\'desc\';uniPergunta()">'+(rec?'Foi desconto':'Ficou mais barato')+'</button></div></div>'}
+  var nv=U.novaData||(U.dataItem&&U.dataItem>hoje()?U.dataItem:addD(hoje(),7));
+  a.innerHTML='<div class="alert inc" style="display:block"><b>Faltaram '+c2s(f)+'. O que é isso?</b><div class="chips" style="margin-top:8px"><button class="'+(U.resto==='deve'?'on':'')+'" onclick="U.resto=\'deve\';uniPergunta()">'+(rec?'Ainda me deve':'Ainda vou pagar o resto')+'</button><button class="'+(U.resto==='desc'?'on':'')+'" onclick="U.resto=\'desc\';uniPergunta()">'+(rec?'Foi desconto':'Ficou mais barato')+'</button></div>'+
+   (U.kind==='avulsa'&&U.resto==='deve'?'<div class="f" style="margin:10px 0 0"><label>'+(rec?'Quando ele vai pagar o resto?':'Quando vai pagar o resto?')+'</label><input type="date" id="uNova" value="'+nv+'" onchange="U.novaData=this.value"></div>':'')+'</div>'}
  else a.innerHTML=''}
 function uniSalvar(){uniLer();var u=U,v=parseBRL(val('uVal'));if(v==null||v<0){toast('Digite o valor');return}
  var t=Date.now(),ids=[],semUndo=null,msg='';
@@ -556,7 +560,8 @@ function uniSalvar(){uniLer();var u=U,v=parseBRL(val('uVal'));if(v==null||v<0){t
   else if(u.kind==='fixa'){var f=fixa(u.id),x=fixaMes(f,u.ref),l2={id:uid(),tipo:'pagfixa',ref:x.k,valor:v,meio:meio,data:data,criado:t,at:t};S.lanc.push(l2);ids=[l2.id];
    if(desc)S.fixasMes[x.k]=Object.assign({},S.fixasMes[x.k]||{},{valor:x.pago+v});msg=f.nome+': '+c2s(v)+' pago'+(falta>0&&!desc?' · falta '+c2s(falta):'')}
   else if(u.kind==='avulsa'){var a=porId(S.avulsas,u.id),pg=soma(u.pags,function(q){return q.valor}),l3={id:uid(),tipo:a.receber?'recavulsa':'pagavulsa',ref:a.id,valor:v,meio:meio,data:data,desc:a.desc,carro:a.carro||null,criado:t,at:t};S.lanc.push(l3);ids=[l3.id];
-   if(desc)editar(a,{valor:pg+v});msg=a.desc+': '+c2s(v)+(a.receber?' recebido':' pago')+(falta>0&&!desc?' · '+(a.receber?'ainda deve ':'falta ')+c2s(falta):'')}
+   var nd=falta>0&&!desc?(val('uNova')||''):'';if(desc)editar(a,{valor:pg+v});else if(nd&&nd!==a.data)editar(a,{data:nd});
+   msg=a.desc+': '+c2s(v)+(a.receber?' recebido':' pago')+(falta>0&&!desc?' · '+(a.receber?'ainda deve ':'falta ')+c2s(falta)+(nd?' para '+dcurto(nd):''):'')}
   if(!(conta(meio)||{}).del)S.ultConta=meio;
   save();fechar();render();toastDesf(msg,{lanc:ids,sem:semUndo});return}
  /* ainda não: só muda o valor (e a data da conta avulsa); não mexe no saldo */
@@ -664,7 +669,7 @@ function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
  viv(S.avulsas).forEach(function(a){if(!a.receber)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&l.tipo==='recavulsa'}),function(l){return l.valor}),r=a.valor-pg;if(r>0&&a.data<=addD(t,60))its.push({av:a,tot:r,data:a.data})});
  if(!its.length)return '';its.sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:0});
  function linha(o){
-  if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'');
+  if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'')+(a.valor>o.tot?' · já recebeu '+c2s(a.valor-o.tot)+' de '+c2s(a.valor):'');
    return '<div class="row tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
   var x=o.x,m=x.multaInfo,mot=x.motorista?primeiroNome(x.motorista):'';
   var sub=(x.data<t?'<span class="neg">atrasado · era '+dcurto(x.data)+'</span>':x.data===t?'hoje':dcurto(x.data))+(mot?' · '+esc(mot):'')+(m&&m.restaMulta>0?' · com multa '+c2s(m.restaMulta):'')+(x.parcial?' · falta parte':'')+(m&&m.aj&&m.aj.valor!=null&&m.aj.motivo?' · '+esc(m.aj.motivo):'')+(m&&m.carry?(function(){var n=cadeiaSemana(carro(x.id),x.sem).filter(function(c){return c.W!==x.sem}).length;return ' · <b class="warnc">+'+n+' semana'+(n>1?'s':'')+' atrás</b>'})():'');
@@ -867,7 +872,7 @@ function vMais(){var h='';
  else{var ymA=ymOf(hoje()),vig=fx.filter(function(f){return fixaVigente(f,ymA)}),tCart=soma(vig.filter(function(f){return ehCartao(f.meio)}),function(f){return valorFixa(f,ymA)}),tBol=soma(vig.filter(function(f){return !ehCartao(f.meio)}),function(f){return valorFixa(f,ymA)});
   h+='<div class="hr"></div><div class="kv"><span><b style="color:var(--tx)">Total por mês</b></span><b style="font-size:17px">'+c2s(tCart+tBol)+'</b></div><div class="kv sub"><span>boleto / débito</span><span>'+c2s(tBol)+'</span></div><div class="kv sub"><span>no cartão (já dentro das faturas)</span><span>'+c2s(tCart)+'</span></div>'}
  h+='<button class="btn sm sec" onclick="abrirFixa()">+ Conta fixa</button></div>';
- h+='<div class="card"><h2>Contas avulsas (uma vez só)</h2>';viv(S.avulsas).slice().sort(function(a,b){return a.data<b.data?-1:1}).forEach(function(a){h+='<div class="row tap" onclick="abrirAvulsa(\''+a.id+'\')"><div class="bub '+(a.receber?'in':'out')+'">'+(a.receber?'📥':'📌')+'</div><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+(a.receber?'a receber':'a pagar')+' · '+dlab(a.data)+'</div></div><div class="v '+(a.receber?'pos':'')+'">'+c2s(a.valor)+'</div></div>'});
+ h+='<div class="card"><h2>Contas avulsas (uma vez só)</h2>';viv(S.avulsas).slice().sort(function(a,b){return a.data<b.data?-1:1}).forEach(function(a){h+='<div class="row tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><div class="bub '+(a.receber?'in':'out')+'">'+(a.receber?'📥':'📌')+'</div><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+(a.receber?'a receber':'a pagar')+' · '+dlab(a.data)+'</div></div><div class="v '+(a.receber?'pos':'')+'">'+c2s(a.valor)+'</div></div>'});
  h+='<button class="btn sm sec" onclick="abrirAvulsa()">+ Conta avulsa</button></div>';
  h+='<div class="card"><h2>Lançamentos</h2>'+mnav('ML');var ls=viv(S.lanc).filter(function(l){return ymOf(l.data)===ML}).sort(function(a,b){return a.data<b.data?1:-1});
  ls.forEach(function(l){var sg=sinal(l);h+='<div class="row tap" onclick="abrirLanc(\''+l.id+'\')"><div class="bub '+(sg>0?'in':sg<0?'out':'card')+'">'+icone({kind:'lanc',id:l.id,titulo:descLanc(l),sinal:sg})+'</div><div class="g"><div class="t">'+esc(descLanc(l))+'</div><div class="s">'+dlab(l.data)+' · '+esc(nomeMeio(l))+'</div></div><div class="v '+(sg>0?'pos':'')+'">'+(sg>0?'+':sg<0?'−':'')+c2s(Math.abs(l.valor)).replace('−','')+'</div></div>'});
@@ -1135,7 +1140,7 @@ function maisOpcoes(inner,txt){var k='pm'+Math.random().toString(36).slice(2,7);
 function pagarRapido(kind,id,ym,fora,quieto){var c=contaPadrao();if(!c&&!fora){precisaConta();return}var t=hoje(),l,reabre,nome;
  if(kind==='fixa'){var x=fixaMes(fixa(id),ym);if(x.resta<=0)return;l={tipo:'pagfixa',ref:id+'|'+ym,valor:x.resta,data:fora?x.due:t};nome=fixa(id).nome;reabre=function(){abrirFixaMes(id,ym)}}
  else if(kind==='fatura'){var f=fatura(id,ym);if(f.resta<=0)return;l={tipo:'pagfatura',ref:id+'|'+ym,valor:f.resta,data:fora?f.vence:t};nome='Fatura '+f.nome;reabre=function(){abrirFatura(id,ym)}}
- else{var a=porId(S.avulsas,id),pg=soma(viv(S.lanc).filter(function(q){return q.ref===id&&(q.tipo==='pagavulsa'||q.tipo==='recavulsa')}),function(q){return q.valor}),rs=a.valor-pg;if(rs<=0)return;l={tipo:a.receber?'recavulsa':'pagavulsa',ref:id,valor:rs,data:fora?a.data:t,desc:a.desc,carro:a.carro||null};nome=a.desc;reabre=function(){abrirAvulsa(id)}}
+ else{var a=porId(S.avulsas,id),pg=soma(viv(S.lanc).filter(function(q){return q.ref===id&&(q.tipo==='pagavulsa'||q.tipo==='recavulsa')}),function(q){return q.valor}),rs=a.valor-pg;if(rs<=0)return;l={tipo:a.receber?'recavulsa':'pagavulsa',ref:id,valor:rs,data:fora?a.data:t,desc:a.desc,carro:a.carro||null};nome=a.desc;reabre=function(){abrirUni('avulsa',id)}}
  l.id=uid();l.meio=fora?'':c;if(fora)l.fora=true;l.criado=Date.now();l.at=Date.now();S.lanc.push(l);if(!fora)S.ultConta=c;if(quieto)return l.id;save();render();
  if(document.getElementById('ov').classList.contains('open'))reabre();
  toastDesf(nome+': '+(fora?'marcado como pago':c2s(l.valor)+(l.tipo==='recavulsa'?' recebido':' pago')),{lanc:[l.id],reabre:reabre})}
@@ -1323,7 +1328,7 @@ function abrirLanc(id){var l=porId(S.lanc,id);if(!l)return;
  if(l.tipo==='entrada'&&l.fonte){abrirSemana(l.fonte,l.fid,l.semana);return}
  if(l.tipo==='pagfatura'){var p=l.ref.split('|');abrirFatura(p[0],p[1]);return}
  if(l.tipo==='pagfixa'){var q=l.ref.split('|');abrirFixaMes(q[0],q[1]);return}
- if(l.tipo==='pagavulsa'||l.tipo==='recavulsa'){abrirAvulsa(l.ref);return}
+ if(l.tipo==='pagavulsa'||l.tipo==='recavulsa'){if(porId(S.avulsas,l.ref))abrirUni('avulsa',l.ref);else abrirAvulsa(l.ref);return}
  NL={tipo:l.tipo,cat:l.cat||'Outros',catManual:1,meio:l.meio,dest:l.dest,de:l.de||'eu',parc:l.parc||1,id:l.id,valor:l.valor,neg:l.valor<0,data:l.data,desc:l.desc,ref:l.ref,carro:l.carro||'',orig:l.orig||'outra'};formLanc()}
 /* ===== lançar (Hudson 03/11): inteligente e curto =====
    Gasto: escreve o que foi e o app sugere a categoria; escolhe Pix/conta ou o cartão e o app já mostra em qual fatura cai
@@ -1393,7 +1398,7 @@ function agendaChipHtml(){if(!nlPodeAgendar())return '';var fut=(NL.data||hoje()
   if(rec)h+='<div class="chips" style="margin-top:8px"><button class="'+(NL.incerto?'':'on')+'" onclick="nlSet(\'incerto\',0)">Deve entrar nessa data</button><button class="'+(NL.incerto?'on':'')+'" onclick="nlSet(\'incerto\',1)">Incerto (não conto com ele)</button></div>'}
  return h+'</div>'}
 function agendadosCarroHtml(car){var as=viv(S.avulsas).filter(function(a){return a.carro===car.id}).map(function(a){var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')}),function(l){return l.valor});return {a:a,resta:a.valor-pg}}).filter(function(o){return o.resta>0}).sort(function(x,y){return x.a.data<y.a.data?-1:1});
- if(!as.length)return '';return '<div class="hr"></div><div class="sub" style="margin:4px 0">Agendado (ainda não aconteceu — não está somado acima)</div>'+as.map(function(o){return '<div class="kv tap" onclick="abrirAvulsa(\''+o.a.id+'\')"><span>'+(o.a.receber?'📥 ':'📌 ')+esc(o.a.desc)+' · '+dcurto(o.a.data)+(o.a.incerto?' · incerto':'')+'</span><b class="'+(o.a.receber?'pos':'')+'">'+(o.a.receber?'+':'')+c2s(o.resta)+'</b></div>'}).join('')}
+ if(!as.length)return '';return '<div class="hr"></div><div class="sub" style="margin:4px 0">Agendado (ainda não aconteceu — não está somado acima)</div>'+as.map(function(o){return '<div class="kv tap" onclick="abrirUni(\'avulsa\',\''+o.a.id+'\')"><span>'+(o.a.receber?'📥 ':'📌 ')+esc(o.a.desc)+' · '+dcurto(o.a.data)+(o.a.incerto?' · incerto':'')+'</span><b class="'+(o.a.receber?'pos':'')+'">'+(o.a.receber?'+':'')+c2s(o.resta)+'</b></div>'}).join('')}
 function fixaDoLanc(){var l=NL.id?porId(S.lanc,NL.id):null;return l&&l.fixaId?fixa(l.fixaId):null}
 function fixaChipHtml(){if(NL.tipo!=='gasto')return '';var fx=fixaDoLanc();
  if(fx&&!fx.del)return '<div class="f"><div class="nlinfo tap" onclick="fechar();abrirFixa(\''+fx.id+'\')">🔁 Já é conta fixa: <b>'+esc(fx.nome)+'</b> · '+(fx.dia?'todo dia '+fx.dia:'dia a confirmar')+' · '+(ehCartao(fx.meio)?'no '+esc((cartao(fx.meio)||{}).nome||'cartão'):'boleto/débito')+' ›</div></div>';
