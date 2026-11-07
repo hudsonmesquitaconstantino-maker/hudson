@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=36, APP_DATE='06/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=37, APP_DATE='07/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -228,10 +228,10 @@ function desfazerRapido(){var u=toast._undo;toast._undo=null;if(!u)return;(u.lan
 function toast(m){var t=document.getElementById('toast');toast._undo=null;t.textContent=m;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('on')},2600)}
 
 /* ---------- estado ---------- */
-function blank(){return {app:'financeiro-hudson',v:1,criadoEm:Date.now(),inicio:ymOf(hoje()),contas:[],cartoes:[],faturas:{},fixas:[],fixasMes:{},carros:[],rendas:[],lanc:[],avulsas:[],semanas:{},backupEm:0,at:0}}
+function blank(){return {app:'financeiro-hudson',v:1,criadoEm:Date.now(),inicio:ymOf(hoje()),contas:[],cartoes:[],faturas:{},fixas:[],fixasMes:{},carros:[],rendas:[],lanc:[],avulsas:[],semanas:{},catsUser:[],backupEm:0,at:0}}
 function norm(s){var b=blank();if(!s||typeof s!=='object')return b;for(var k in b)if(s[k]===undefined||s[k]===null)s[k]=b[k];
  ['contas','cartoes','fixas','carros','rendas','lanc','avulsas'].forEach(function(k){if(!Array.isArray(s[k]))s[k]=[]});
- if(typeof s.faturas!=='object')s.faturas={};if(!s.semanas||typeof s.semanas!=='object')s.semanas={};if(typeof s.fixasMes!=='object')s.fixasMes={};return s}
+ if(typeof s.faturas!=='object')s.faturas={};if(!s.semanas||typeof s.semanas!=='object')s.semanas={};if(typeof s.fixasMes!=='object')s.fixasMes={};if(!Array.isArray(s.catsUser))s.catsUser=[];return s}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return norm(JSON.parse(r))}catch(e){}return blank()}
 function save(){S.at=Date.now();var j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){toast('⚠️ Não consegui salvar neste aparelho')}idbPut(j)}
 /* cópia espelho no IndexedDB (se o iPhone limpar uma, a outra recupera) */
@@ -607,7 +607,7 @@ function nuDesenha(){var n=NU,saiu=n.tipo==='out',card=saiu&&ehCartao(n.meio),fu
   if(card)h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(q){return '<button class="'+((+n.parc||1)===q?'on':'')+'" onclick="nuSet(\'parc\','+q+')">'+(q===1?'À vista':q+'x')+'</button>'}).join('')+'<button class="'+(n.de==='pai'?'on':'')+'" onclick="nuSet(\'de\',\''+(n.de==='pai'?'eu':'pai')+'\')">É do pai</button></div></div>'}
  else if(n.feito&&viv(S.contas).length>1)h+='<div class="f"><label>Caiu em</label><div class="chips">'+optContas().map(function(c){return '<button class="'+(n.meio===c[0]?'on':'')+'" onclick="nuSet(\'meio\',\''+c[0]+'\')">'+esc(c[1])+'</button>'}).join('')+'</div></div>';
  h+='<div class="f"><label>Carro (opcional)</label><div class="chips"><button class="'+(!n.carro?'on':'')+'" onclick="nuSet(\'carro\',\'\')">Nenhum</button>'+carrosAtivos().map(function(c){return '<button class="'+(n.carro===c.id?'on':'')+'" onclick="nuSet(\'carro\',\''+c.id+'\')">'+esc(c.nome.split(' ')[0])+'</button>'}).join('')+'</div></div>';
- if(saiu){var cs=catsUsadas();h+='<div class="f"><label>Categoria</label>'+(n.verCats?'<div class="chips">'+cs.map(function(c){return '<button class="'+(n.cat===c?'on':'')+'" onclick="NU.verCats=false;nuSet(\'cat\',\''+esc(c)+'\')">'+esc(c)+'</button>'}).join('')+'</div>':'<div class="nlinfo tap" onclick="nuLer();NU.verCats=true;nuDesenha()">'+(n.cat?'<b>'+esc(n.cat)+'</b>':'Escolher')+' · trocar ›</div>')+'</div>'}
+ if(saiu){var cs=catsUsadas();h+='<div class="f"><label>Categoria</label>'+(n.verCats?'<div class="chips">'+cs.map(function(c){return '<button class="'+(n.cat===c?'on':'')+'" onclick="NU.verCats=false;nuSet(\'cat\',\''+esc(c)+'\')">'+esc(c)+'</button>'}).join('')+(n.novaCat?'':'<button onclick="nuLer();NU.novaCat=true;nuDesenha()">+ Nova</button>')+'</div>'+(n.novaCat?'<div style="display:flex;gap:8px;margin-top:8px"><input id="nuCatNova" placeholder="Nome da categoria" autocomplete="off" style="flex:1"><button class="btn sm" style="width:auto;margin:0" onclick="nuNovaCat()">Criar</button></div>':''):'<div class="nlinfo tap" onclick="nuLer();NU.verCats=true;nuDesenha()">'+(n.cat?'<b>'+esc(n.cat)+'</b>':'Escolher')+' · trocar ›</div>')+'</div>'}
  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="nuSalvar()">Salvar</button>';
  h+='<button class="btn sec" onclick="NL=null;novoLanc(\'reembolso\')">Outro tipo: reembolso do pai, empréstimo, transferência</button><button class="btn sec" onclick="fechar()">Cancelar</button>';
  abrir(h)}
@@ -734,7 +734,7 @@ function catsMes(ym){var c={},pai=0;function add(k,v){if(!(v>0))return;c[k]=(c[k
  return {c:c,pai:pai}}
 /* ===== Resumo do mês (Hudson 03/11): tudo num lugar só — quanto entrou e saiu, para onde foi, cada cartão por categoria e as dívidas ===== */
 function barrasCat(o,tot,max){var ks=Object.keys(o).sort(function(a,b){return o[b]-o[a]}),out=ks.slice(0,max||ks.length),resto=soma(ks.slice(max||ks.length),function(k){return o[k]});
- return out.map(function(k){var pc=tot?o[k]/tot*100:0;return '<div class="catr"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(o[k])+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+(resto>0?'<div class="kv sub" style="margin-top:4px"><span>Outras categorias</span><span>'+c2s(resto)+' · '+Math.round(resto/tot*100)+'%</span></div>':'')}
+ return out.map(function(k){var pc=tot?o[k]/tot*100:0;return '<div class="catr'+(o===_catsLinkObj?' tap" onclick="abrirCat(\''+esc(k).replace(/'/g,"\\'")+'\',M)':'')+'"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(o[k])+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+(resto>0?'<div class="kv sub" style="margin-top:4px"><span>Outras categorias</span><span>'+c2s(resto)+' · '+Math.round(resto/tot*100)+'%</span></div>':'')}
 function catsFatura(cid,ym){var x=fatura(cid,ym),c={},paiIt=0;x.its.forEach(function(i){if(i.pai){paiIt+=i.v;return}var k=i.kind==='lanc'?(i.l.cat||'A classificar'):(i.f.cat||'Outros');c[k]=(c[k]||0)+i.v});
  var id=soma(Object.keys(c),function(k){return c[k]}),resto=x.valor-id-paiIt;if(resto>0)c['A classificar']=(c['A classificar']||0)+resto;
  return {c:c,pai:Math.max(x.pai,paiIt),valor:x.valor,paiSemMarcar:x.pai>paiIt+100}}
@@ -744,7 +744,7 @@ function vResumo(){var it=itensMes(M);
  var h='<div class="card"><div class="tri"><div><span>Entra</span><b class="pos">'+c2s(entT)+'</b></div><div><span>Sai</span><b>'+c2s(saiT)+'</b></div><div><span>'+(sob<0?'Falta':'Sobra')+'</span><b class="'+(sob<0?'neg':'pos')+'">'+c2s(Math.abs(sob))+'</b></div></div><div class="sub" style="margin-top:6px">Previsto do mês inteiro (já recebido + a receber; já pago + a pagar). Só o que é seu: sem a parte do seu pai nas faturas'+(paiF?' ('+c2s(paiF)+')':'')+', sem o reembolso dele, empréstimo e venda.</div></div>';
  var cm=catsMes(M),tc=soma(Object.keys(cm.c),function(k){return cm.c[k]});
  var semMarcar=viv(S.cartoes).some(function(c){return catsFatura(c.id,M).paiSemMarcar});
- if(tc)h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+barrasCat(cm.c,tc,8)+(cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas</span><b>'+c2s(cm.pai)+'</b></div>':'')+(semMarcar?'<div class="sub" style="margin-top:4px">Inclui compras do seu pai que ainda não foram marcadas como dele.</div>':'')+'</div>';
+ _catsLinkObj=cm.c;if(tc)h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+barrasCat(cm.c,tc,99)+(cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas</span><b>'+c2s(cm.pai)+'</b></div>':'')+(semMarcar?'<div class="sub" style="margin-top:4px">Inclui compras do seu pai que ainda não foram marcadas como dele.</div>':'')+'</div>';
  viv(S.cartoes).forEach(function(c){var f=catsFatura(c.id,M);if(f.valor<=0)return;var tot=soma(Object.keys(f.c),function(k){return f.c[k]});
   h+='<div class="card tap" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><h2>'+esc(c.nome)+'<span style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--tx)">'+c2s(f.valor)+'</span></h2>'+barrasCat(f.c,tot,4)+(f.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai</span><b>'+c2s(f.pai)+'</b></div>':'')+(f.paiSemMarcar?'<div class="sub" style="margin-top:4px">As compras do seu pai ainda não estão marcadas, então as categorias incluem a parte dele. Toque aqui, abra a compra e marque "Do pai".</div>':'')+'</div>'});
  /* dívidas que já estão contratadas daqui para frente */
@@ -757,7 +757,7 @@ function vDespesas(){var it=itensMes(M),t=hoje();
  var tot=soma(ds,suaV),falta=soma(ds,suaR),pago=tot-falta,paiF=paiNasFaturas(ds);
  var h='<div class="card"><div class="tri"><div><span>Pago</span><b>'+c2s(pago)+'</b></div><div><span>Falta pagar</span><b class="'+(falta?'neg':'')+'">'+c2s(falta)+'</b></div><div><span>Seu gasto no mês</span><b>'+c2s(tot)+'</b></div></div><div class="sub" style="margin-top:6px">'+(paiF?'Sem a parte do seu pai nas faturas ('+c2s(paiF)+'): você paga no cartão e ele devolve, não é gasto seu. ':'')+'Compras no cartão não entram de novo.</div></div>';
  var cm=catsMes(M),ks=Object.keys(cm.c).sort(function(a,b){return cm.c[b]-cm.c[a]}),tc=soma(ks,function(k){return cm.c[k]});
- if(ks.length){h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+ks.map(function(k){var v=cm.c[k],pc=tc?v/tc*100:0;return '<div class="catr"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+
+ if(ks.length){h+='<div class="card"><h2>Para onde vai o dinheiro</h2>'+ks.map(function(k){var v=cm.c[k],pc=tc?v/tc*100:0;return '<div class="catr tap" onclick="abrirCat(\''+esc(k).replace(/'/g,"\\'")+'\',M)"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+Math.round(pc)+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+
   (cm.pai?'<div class="kv" style="margin-top:6px"><span>Do seu pai nas faturas (ele devolve)</span><b>'+c2s(cm.pai)+'</b></div>':'')+(cm.c['A classificar']?'<div class="sub" style="margin-top:6px">"A classificar": compras que vieram da fatura sem categoria. Toque na compra (em Cartões) para escolher.</div>':'')+'</div>'}
  if(!ds.length)h+='<div class="card"><div class="empty">Nenhuma despesa neste mês.</div></div>';
  else h+='<div class="card"><h2>Contas e gastos</h2>'+listaPorDia(ds)+'</div>';
@@ -1379,7 +1379,7 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
  if(NL.tipo==='gasto'){
   h+='<div class="f"><input id="lDesc" value="'+esc(NL.desc||'')+'" placeholder="O que foi? (ex.: açaí, gasolina)" oninput="descMudou(this.value)"></div>';
   var cs=catsUsadas(),top=NL.todasCats?cs:cs.slice(0,8);if(NL.cat&&top.indexOf(NL.cat)<0)top=[NL.cat].concat(top.slice(0,7));
-  h+='<div class="f"><div class="chips" id="lCats">'+top.map(function(c){return '<button data-c="'+esc(c)+'" class="'+(NL.cat===c?'on':'')+'" onclick="nlSet(\'cat\',\''+c+'\')">'+c+'</button>'}).join('')+(NL.todasCats?'':'<button onclick="NL.todasCats=1;nlSet(\'x\',0)">mais…</button>')+'</div></div>';
+  h+='<div class="f"><div class="chips" id="lCats">'+top.map(function(c){return '<button data-c="'+esc(c)+'" class="'+(NL.cat===c?'on':'')+'" onclick="nlSet(\'cat\',\''+c+'\')">'+c+'</button>'}).join('')+(NL.todasCats?(NL.novaCat?'':'<button onclick="NL.novaCat=1;nlSet(\'x\',0)">+ Nova</button>'):'<button onclick="NL.todasCats=1;nlSet(\'x\',0)">mais…</button>')+'</div>'+(NL.novaCat?'<div style="display:flex;gap:8px;margin-top:8px"><input id="nlCatNova" placeholder="Nome da categoria" autocomplete="off" style="flex:1"><button class="btn sm" style="width:auto;margin:0" onclick="nlNovaCat()">Criar</button></div>':'')+'</div>';
   var meios=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(viv(S.cartoes).map(function(c){return [c.id,c.nome]}));
   h+='<div class="f"><label>Pagou com</label>'+chipsHtml(meios,NL.meio,'nlMeio')+'</div>';
   if(ehCartao(NL.meio)){h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(n){return '<button class="'+((+NL.parc||1)===n?'on':'')+'" onclick="nlSet(\'parc\','+n+')">'+(n===1?'À vista':n+'x')+'</button>'}).join('')+'<button class="'+(NL.de==='pai'?'on':'')+'" onclick="nlSet(\'de\',NL.de===\'pai\'?\'eu\':\'pai\')">É do pai</button></div></div>'+infoCartao()}
@@ -1570,6 +1570,64 @@ button.okb{background:var(--acc);color:#04150F}
 (function(){var R=document.documentElement;function campo(e){if(!e)return false;var t=e.tagName;if(t==='TEXTAREA'||t==='SELECT'||e.isContentEditable)return true;return t==='INPUT'&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(e.type||'')}
 function upd(){var vv=window.visualViewport,kb=vv?(window.innerHeight-vv.height*vv.scale>140):false;R.classList.toggle('tecladoAberto',campo(document.activeElement)||kb)}
 document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,150)},true);if(window.visualViewport)window.visualViewport.addEventListener('resize',upd)})();
+</script>
+<script id="catsUser">var _catsLinkObj=null;
+/* ===== Hudson 07/11: CATEGORIAS SUAS ("títulos") — criar, renomear, apagar; já vem "Namorada".
+   Cada categoria tem a tela do mês: total, cada gasto com data e de onde saiu (Pix ou cartão), e os últimos 6 meses.
+   Só organiza: nenhum valor muda. Apagar uma categoria manda os gastos dela para "Outros". ===== */
+function catsSync(){if(!window._CATS0)window._CATS0=CATS.slice();var u=(S&&Array.isArray(S.catsUser))?S.catsUser:[],b=_CATS0.slice(),i=b.indexOf('Outros');if(i<0)i=b.length;
+ var ex=u.filter(function(c){return c&&b.indexOf(c)<0});CATS.length=0;Array.prototype.push.apply(CATS,b.slice(0,i).concat(ex,b.slice(i)))}
+function catsSeed(){if(!S)return;if(!Array.isArray(S.catsUser))S.catsUser=[];if(!S.catsSeed){if(S.catsUser.indexOf('Namorada')<0)S.catsUser.push('Namorada');S.catsSeed=1;save()}catsSync()}
+function catNomeLimpo(t){t=String(t||'').replace(/\s+/g,' ').trim().slice(0,30);return t?t.charAt(0).toUpperCase()+t.slice(1):''}
+function criarCategoria(nome){nome=catNomeLimpo(nome);if(!nome){toast('Escreva o nome');return ''}
+ var ja=CATS.filter(function(c){return c.toLowerCase()===nome.toLowerCase()})[0];if(ja)return ja;
+ S.catsUser.push(nome);save();catsSync();toast('Categoria criada: '+nome);return nome}
+function catDoUser(c){return Array.isArray(S.catsUser)&&S.catsUser.indexOf(c)>=0}
+/* "+ Nova" dentro dos formulários */
+function nuNovaCat(){nuLer();var n=criarCategoria(val('nuCatNova'));if(!n)return;NU.cat=n;NU.catMan=true;NU.novaCat=false;NU.verCats=false;nuDesenha()}
+function nlNovaCat(){var n=criarCategoria(val('nlCatNova'));if(!n)return;NL.novaCat=false;nlSet('cat',n)}
+/* tudo que entrou numa categoria no mês (mesma conta do "Para onde vai o dinheiro") */
+function catItens(cat,ym){var out=[];
+ viv(S.cartoes).forEach(function(cc){var x=fatura(cc.id,ym);if(x.valor<=0)return;x.its.forEach(function(i){var ct=i.kind==='lanc'?(i.l.cat||'A classificar'):(i.f.cat||'Outros');if(ct!==cat)return;
+  var v=i.v;if(i.pai){var ar=arredPai(i.v);if(!(i.v>ar))return;v=i.v-ar}
+  out.push({data:i.data,nome:i.nome,v:v,onde:'cartão '+cc.nome+(i.n>1?' · parcela '+i.i+'/'+i.n:''),lid:i.kind==='lanc'?i.l.id:'',fid:i.kind==='fixa'?i.f.id:''})})});
+ viv(S.lanc).forEach(function(l){if(ymOf(l.data)!==ym||l.tipo!=='gasto'||ehCartao(l.meio)||(l.cat||'Outros')!==cat)return;var cn=conta(l.meio);out.push({data:l.data,nome:l.desc||l.cat||'Gasto',v:l.valor,onde:cn?'Pix · '+cn.nome:'Pix',lid:l.id})});
+ viv(S.fixas).forEach(function(f){if(ehCartao(f.meio)||!fixaVigente(f,ym)||(f.cat||'Outros')!==cat)return;out.push({data:diaNoMes(ym,f.dia||1),nome:f.nome,v:valorFixa(f,ym),onde:'conta fixa',fid:f.id})});
+ viv(S.avulsas).forEach(function(a){if(a.receber||ymOf(a.data)!==ym||(a.cat||sugCat(a.desc)||'Outros')!==cat)return;out.push({data:a.data,nome:a.desc,v:a.valor,onde:'conta avulsa',aid:a.id})});
+ out.sort(function(a,b){return a.data<b.data?1:-1});return out}
+function abrirCat(cat,ym){ym=ym||M;window._CATV={c:cat,ym:ym};var its=catItens(cat,ym),tot=soma(its,function(x){return x.v}),cm=catsMes(ym).c[cat]||0,resto=cm-tot;
+ var h='<h3>'+esc(cat)+'</h3><div class="sub">'+esc(mesNome(ym))+'</div>';
+ h+='<div class="card" style="margin-top:10px;text-align:center"><div class="sub">Gasto no mês</div><div class="big">'+c2s(cm)+'</div><div class="sub">'+its.length+' gasto'+(its.length!==1?'s':'')+'</div></div>';
+ if(resto>0)h+='<div class="sub" style="margin:-4px 2px 10px">Inclui '+c2s(resto)+' da fatura sem compra lançada.</div>';
+ h+='<div class="card"><h2>Gastos</h2>'+(its.length?its.map(function(x){var oc=x.lid?"abrirLanc('"+x.lid+"')":x.fid?"abrirFixa('"+x.fid+"')":x.aid?"abrirUni('avulsa','"+x.aid+"')":'';
+  return '<div class="row'+(oc?' tap':'')+'"'+(oc?' onclick="'+oc+'"':'')+'><div class="g"><div class="t">'+esc(x.nome)+'</div><div class="s">'+esc(dlab(x.data))+' · '+esc(x.onde)+'</div></div><b>'+c2s(x.v)+'</b></div>'}).join(''):'<div class="empty">Nenhum gasto nesta categoria neste mês.</div>')+'</div>';
+ var ms=[];for(var k=5;k>=0;k--){var y=addM(ym,-k);ms.push([y,catsMes(y).c[cat]||0])}var mx=Math.max.apply(null,ms.map(function(x){return x[1]}).concat([1]));
+ h+='<div class="card"><h2>Últimos 6 meses</h2>'+ms.map(function(x){return '<div class="catr tap" onclick="abrirCat(\''+esc(cat).replace(/'/g,"\\'")+'\',\''+x[0]+'\')"><div class="kv"><span>'+esc(mesNome(x[0]))+(x[0]===ym?' ·':'')+'</span><b>'+c2s(x[1])+'</b></div><div class="cb"><i style="width:'+Math.max(2,x[1]/mx*100)+'%"></i></div></div>'}).join('')+
+  '<div class="kv sub" style="margin-top:6px"><span>Média por mês</span><span>'+c2s(Math.round(soma(ms,function(x){return x[1]})/6))+'</span></div></div>';
+ if(catDoUser(cat))h+='<button class="btn sec" onclick="catRenomear()">Renomear categoria</button><button class="btn sec" style="color:var(--red)" onclick="catApagar()">Apagar categoria</button>';
+ h+='<button class="btn sec" onclick="fechar()">Fechar</button>';abrir(h)}
+function catRenomear(){var c=_CATV.c,h='<h3>Renomear</h3><div class="f"><label>Nome</label><input id="catNome" value="'+esc(c)+'" autocomplete="off"></div><button class="btn" onclick="catRenomearOk()">Salvar</button><button class="btn sec" onclick="abrirCat(_CATV.c,_CATV.ym)">Voltar</button>';abrir(h)}
+function catRenomearOk(){var a=_CATV.c,n=catNomeLimpo(val('catNome'));if(!n){toast('Escreva o nome');return}if(n===a)return abrirCat(a,_CATV.ym);
+ if(CATS.some(function(c){return c!==a&&c.toLowerCase()===n.toLowerCase()})){toast('Já existe uma categoria com esse nome');return}
+ var i=S.catsUser.indexOf(a);if(i>=0)S.catsUser[i]=n;[S.lanc,S.fixas,S.avulsas].forEach(function(L){(L||[]).forEach(function(x){if(x.cat===a){x.cat=n;x.at=Date.now()}})});
+ save();catsSync();render();toast('Renomeada para '+n);abrirCat(n,_CATV.ym)}
+function catApagar(){var a=_CATV.c,n=0;[S.lanc,S.fixas,S.avulsas].forEach(function(L){(L||[]).forEach(function(x){if(x.cat===a&&!x.del)n++})});
+ var h='<h3>Apagar "'+esc(a)+'"?</h3><div class="sub" style="margin:6px 0 14px">'+(n?n+' gasto'+(n!==1?'s':'')+' desta categoria passa'+(n!==1?'m':'')+' para "Outros". Nenhum valor muda.':'Nenhum gasto usa esta categoria.')+'</div><button class="btn" style="background:var(--red)" onclick="catApagarOk()">Apagar</button><button class="btn sec" onclick="abrirCat(_CATV.c,_CATV.ym)">Voltar</button>';abrir(h)}
+function catApagarOk(){var a=_CATV.c;S.catsUser=S.catsUser.filter(function(c){return c!==a});[S.lanc,S.fixas,S.avulsas].forEach(function(L){(L||[]).forEach(function(x){if(x.cat===a){x.cat='Outros';x.at=Date.now()}})});
+ save();catsSync();fechar();render();toast('Categoria apagada')}
+function abrirNovaCat(){abrir('<h3>Nova categoria</h3><div class="sub">Ex.: Namorada, Pet, Faculdade. Aparece na hora de lançar um gasto.</div><div class="f" style="margin-top:10px"><label>Nome</label><input id="catNova" autocomplete="off" placeholder="Nome da categoria"></div><button class="btn" onclick="var n=criarCategoria(val(\'catNova\'));if(n){fechar();render()}">Criar</button><button class="btn sec" onclick="fechar()">Cancelar</button>');setTimeout(function(){try{document.getElementById('catNova').focus()}catch(e){}},250)}
+function catsCardMais(){var ym=ymOf(hoje()),cm=catsMes(ym).c,u=(S.catsUser||[]);
+ var h='<div class="card"><h2>Suas categorias</h2>'+(u.length?u.map(function(c){return '<div class="row tap" onclick="abrirCat(\''+esc(c).replace(/'/g,"\\'")+'\',\''+ym+'\')"><div class="bub out">🏷️</div><div class="g"><div class="t">'+esc(c)+'</div><div class="s">'+esc(mesNome(ym))+'</div></div><b>'+c2s(cm[c]||0)+'</b></div>'}).join(''):'<div class="empty">Nenhuma ainda.</div>')+
+  '<button class="btn sm sec" onclick="abrirNovaCat()">+ Nova categoria</button></div>';return h}
+/* suas categorias aparecem logo depois das mais usadas (não lá no fim) */
+window.catsUsadas=catsUsadas=function(){var n={},lim=addD(hoje(),-120);viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat&&!l.imp&&l.data>=lim)n[l.cat]=(n[l.cat]||0)+1});
+ var base=['Alimentação','iFood','Mercado','Combustível','Carros','Compras','Lazer','Casa'].concat(S.catsUser||[]);
+ return CATS.filter(function(c){return c!=='A classificar'}).sort(function(a,b){return (n[b]||0)-(n[a]||0)||((base.indexOf(a)<0?99:base.indexOf(a))-(base.indexOf(b)<0?99:base.indexOf(b)))})};
+(function(){
+ var oR=window.render;window.render=render=function(){try{if(S&&!window._catsOk){window._catsOk=1;catsSeed()}else catsSync()}catch(e){}return oR.apply(this,arguments)};
+ var oM=window.vMais;window.vMais=vMais=function(){var h=oM.apply(this,arguments),k=h.indexOf('<div class="card"><h2>Contas fixas</h2>');var c=catsCardMais();return k>=0?h.slice(0,k)+c+h.slice(k):h+c};
+})();
+try{catsSeed();render()}catch(e){}
 </script>
 </body>
 </html>
