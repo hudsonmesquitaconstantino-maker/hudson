@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=37, APP_DATE='07/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=38, APP_DATE='07/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -427,6 +427,7 @@ function bubCls(x){if(x.status==='parado'||x.status==='cartao')return 'off';if(x
 function pillStatus(x,proj){
  if(x.status==='pago')return x.sinal>0?'<span class="pill ok">recebido</span>':'<span class="pill ok">pago</span>';
  if(x.kind==='multa')return x.status==='pago'?'<span class="pill ok">multa paga</span>':'<span class="pill inc">multa a cobrar</span>';
+ if(x.parcial&&x._semDe)return '<span class="pill inc">restante</span>';
  if(x.parcial)return '<span class="pill inc">pagou parte · falta '+c2s(x.resta)+'</span>';
  if(x.status==='atrasado')return x.sinal>0?'<span class="pill bad">não registrado</span>':'<span class="pill bad">atrasado</span>';
  if(x.status==='parado')return x.semContrato?'<span class="pill">sem contrato</span>':'<span class="pill">parado</span>';
@@ -453,7 +454,7 @@ function linhaItem(x,proj,dep){
  var sub=[];if(x.atrasado)sub.push('venceu '+dlab(x.dataOrig));if(x.semData)sub.push('data a confirmar');
  if(x.kind==='carro'&&x.status==='pago'&&x.contrato&&x.valor!==x.contrato)sub.push('contrato '+c2s(x.contrato));
  if((x.kind==='carro'||x.kind==='multa')&&x.nota&&x.status!=='pago')sub.push(x.nota);
- if(proj&&x.resta!==x.valor&&x.status!=='parado')sub.push('de '+c2s(x.valor));
+ if(proj&&x.resta!==x.valor&&x.status!=='parado'&&!x._semDe)sub.push('de '+c2s(x.valor));
  if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte '+c2s(suaV(x))+' · seu pai '+c2s(x.pai));
  var muted=(x.status==='pago'||x.status==='parado'||x.status==='cartao')&&!proj?' muted':'';
  var pl=pillStatus(x,proj),aft='';
@@ -688,7 +689,7 @@ function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
  viv(S.avulsas).forEach(function(a){if(!a.receber)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&l.tipo==='recavulsa'}),function(l){return l.valor}),r=a.valor-pg;if(r>0&&a.data<=addD(t,60))its.push({av:a,tot:r,data:a.data})});
  if(!its.length)return '';its.sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:0});
  function linha(o){
-  if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'')+(a.valor>o.tot?' · já recebeu '+c2s(a.valor-o.tot)+' de '+c2s(a.valor):'');
+  if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'')
    return '<div class="row tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
   var x=o.x,m=x.multaInfo,mot=x.motorista?primeiroNome(x.motorista):'';
   var sub=(x.data<t?'<span class="neg">atrasado · era '+dcurto(x.data)+'</span>':x.data===t?'hoje':dcurto(x.data))+(mot?' · '+esc(mot):'')+(m&&m.restaMulta>0?' · com multa '+c2s(m.restaMulta):'')+(x.parcial?' · falta parte':'')+(m&&m.aj&&m.aj.valor!=null&&m.aj.motivo?' · '+esc(m.aj.motivo):'')+(m&&m.carry?(function(){var n=cadeiaSemana(carro(x.id),x.sem).filter(function(c){return c.W!==x.sem}).length;return ' · <b class="warnc">+'+n+' semana'+(n>1?'s':'')+' atrás</b>'})():'');
@@ -707,7 +708,19 @@ function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
 /* ===== Agenda: Tudo · Entradas · Despesas (Hudson 03/11: "visualizar o que são as entradas do mês e as despesas do mês") ===== */
 function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas'],['resumo','Resumo']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
 /* lista agrupada por dia, com a data em cima de cada grupo (igual à Agenda) */
-function listaPorDia(xs){var t=hoje(),dias={},ordem=[];xs.forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
+/* Hudson 07/11: pagamento PARCIAL vira linha própria na agenda, no dia em que entrou ("Parcial · Multa", "Parcial semanal · Mobi"),
+   e o item mostra só o que falta. Só muda a LISTA — nenhuma conta/soma usa isto. */
+function comParciais(xs,ym){ym=ym||M;var out=[];
+ xs.forEach(function(x){var pags=null,nome='',pre='';
+  if(x.kind==='avulsa'){var a=porId(S.avulsas,x.id);if(a){pags=viv(S.lanc).filter(function(l){return l.ref===x.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')});nome=a.desc;pre='Parcial · '}}
+  else if(x.kind==='carro'&&x.multaInfo&&x.status!=='adiado'){pags=(x.multaInfo.rs||[]).slice();nome=x.titulo;pre='Parcial semanal · '}
+  if(!pags||!pags.length||(x.resta<=0&&pags.length<2)){out.push(x);return}
+  pags.sort(function(a,b){var p=a.data+(a.hora||'')+(a.criado||''),q=b.data+(b.hora||'')+(b.criado||'');return p<q?-1:p>q?1:0});
+  pags.forEach(function(l,i){if(ymOf(l.data)!==ym)return;var ult=i===pags.length-1&&x.resta<=0;
+   out.push({kind:'lanc',id:l.id,data:l.data,sinal:x.sinal,valor:l.valor,resta:0,cert:'certo',titulo:(ult?(x.kind==='carro'?'Restante semanal · ':'Restante · '):pre)+nome,status:'feito'})});
+  if(x.resta>0)out.push(Object.assign({},x,{valor:x.resta,_semDe:1}))});
+ return out}
+function listaPorDia(xs){xs=comParciais(xs);var t=hoje(),dias={},ordem=[];xs.forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
  ordem.sort();return ordem.map(function(d){return '<div class="dayh'+(d===t?' hoje':'')+'"><span>'+(d==='zz'?'Data a confirmar':(d===t?'Hoje · ':'')+dlab(d))+'</span></div>'+dias[d].map(function(x){return linhaItem(x,false,null)}).join('')}).join('')}
 function ehVendaL(l){return !!(l&&l.tipo==='entrada'&&!l.fonte&&(l.orig==='venda'||/venda/i.test(l.desc||'')))}
 function ehVenda(x){if(x.kind!=='lanc')return false;return ehVendaL(porId(S.lanc,x.id))}
@@ -773,7 +786,7 @@ function vAgenda(){if(AG==='entradas')return mnav()+segAg()+vEntradas();if(AG===
  else if(M>=ymOf(t))h+='<div class="card tap" onclick="abrirSaldo()" style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px"><span class="sub">Dinheiro hoje ('+dcurto(t)+')</span><b class="mid">'+c2s(sal)+'</b></div>';
  if(!it.length)return h+'<div class="card"><div class="empty">Nada neste mês.</div></div>';
  h+='<div class="card">';var dias={},ordem=[];
- it.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&!(x.status==='cartao')&&!adiadaVazia(x)}).forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
+ comParciais(it.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&!(x.status==='cartao')&&!adiadaVazia(x)}),M).forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
  ordem.forEach(function(d){var futuro=d!=='zz'&&d>=t,sd=futuro&&sal!=null&&p.dias[d]?p.dias[d].saldo:null;
   h+='<div class="dayh'+(d===t?' hoje':'')+'"><span>'+(d==='zz'?'Data a confirmar':(d===t?'Hoje · ':'')+dlab(d))+'</span>'+(sd!=null?'<span class="sd'+(sd<0?' neg':'')+'">saldo '+c2s(sd)+'</span>':'')+'</div>';
   dias[d].forEach(function(x){h+=linhaItem(x,false,futuro||x.status==='atrasado'?p.dep[chaveItem(x)]:null)})});
