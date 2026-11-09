@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=42, APP_DATE='09/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=43, APP_DATE='09/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -339,7 +339,8 @@ function itensMes(ym){
   if(k.carry){var nC=Math.max(k.carryL.length,cadeiaSemana(car,s).filter(function(c){return c.W!==s}).length);base.nota=(base.nota?base.nota+' · ':'')+'inclui '+c2s(k.carry)+' de '+nC+' semana'+(nC>1?'s':'')+' anterior'+(nC>1?'es':'')}
   if(k.devido<=0&&!k.rs.length&&!k.carry){out.push(Object.assign(base,inf.status==='adiantado'?{valor:0,resta:0,cert:'certo',status:'adiantado'}:{valor:0,resta:0,cert:'certo',status:'parado',semContrato:inf.status==='semContrato'}));return}
   if(k.restaSem+k.carry<=0)out.push(Object.assign(base,{valor:Math.min(k.rec,Math.max(0,k.devido-k.abat))||k.rec,resta:0,cert:'certo',status:'pago'}));
-  else out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:certCarro(car,inf,s),status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}));
+  else{var cc=certCarro(car,inf,s);if(cc==='incerta'&&inf.encerrado)base.nota=(base.nota?base.nota+' · ':'')+'contrato encerrado'+(inf.fimCt&&(base.nota||'').indexOf(dcurto(inf.fimCt))<0?' em '+dcurto(inf.fimCt):'');
+   out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:cc,status:atras(s)?'atrasado':'pendente',parcial:k.pago>0}))}
   if(k.multa>0)out.push({kind:'multa',id:car.id,sem:s,data:addD(s,Math.max(0,k.dias-1)),sinal:1,valor:k.multa,resta:k.restaMulta,cert:'incerta',titulo:car.nome+' · multa',nota:k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md),status:k.restaMulta<=0?'pago':(addD(s,4)<t?'atrasado':'pendente')})})});
  viv(S.rendas).forEach(function(r){if(!(r.valor>0))return;if(r.inicio&&r.inicio>ym)return;semanasDoMes(ym,r.diaSem==null?3:+r.diaSem).forEach(function(s){
   var rs=recebSemana('renda',r.id,s),rec=soma(rs,function(l){return l.valor});
@@ -692,18 +693,20 @@ function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
   if(o.av){var a=o.av,car=a.carro?carro(a.carro):null,sub=(a.data<t?'<span class="neg">cobrar · era '+dcurto(a.data)+'</span>':a.data===t?'hoje':dcurto(a.data))+(a.incerto?' · <span class="warnc">incerto</span>':'')+(car&&a.desc.indexOf(car.nome)<0?' · '+esc(car.nome):'')
    return '<div class="row tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
   var x=o.x,m=x.multaInfo,mot=x.motorista?primeiroNome(x.motorista):'';
-  var sub=(x.data<t?'<span class="neg">atrasado · era '+dcurto(x.data)+'</span>':x.data===t?'hoje':dcurto(x.data))+(mot?' · '+esc(mot):'')+(m&&m.restaMulta>0?' · com multa '+c2s(m.restaMulta):'')+(x.parcial?' · falta parte':'')+(m&&m.aj&&m.aj.valor!=null&&m.aj.motivo?' · '+esc(m.aj.motivo):'')+(m&&m.carry?(function(){var n=cadeiaSemana(carro(x.id),x.sem).filter(function(c){return c.W!==x.sem}).length;return ' · <b class="warnc">+'+n+' semana'+(n>1?'s':'')+' atrás</b>'})():'');
+  var sub=(x.data<t?'<span class="neg">atrasado · era '+dcurto(x.data)+'</span>':x.data===t?'hoje':dcurto(x.data))+(mot?' · '+esc(mot):'')+(m&&m.restaMulta>0?' · com multa '+c2s(m.restaMulta):'')+(x.parcial?' · falta parte':'')+(x.cert==='incerta'?' · <span class="warnc">incerto'+(m&&m.inf&&m.inf.encerrado?' · contrato encerrado':'')+'</span>':'')+(m&&m.aj&&m.aj.valor!=null&&m.aj.motivo?' · '+esc(m.aj.motivo):'')+(m&&m.carry?(function(){var n=cadeiaSemana(carro(x.id),x.sem).filter(function(c){return c.W!==x.sem}).length;return ' · <b class="warnc">+'+n+' semana'+(n>1?'s':'')+' atrás</b>'})():'');
   return '<div class="row tap" onclick="'+acaoItem(x)+'"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();'+(x.kind==='carro'?"receberSemana('"+x.id+"','"+x.sem+"')":"receberRenda('"+x.id+"','"+x.sem+"')")+'"></button><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+sub+'</div></div><div class="v pos">'+c2s(o.tot)+'</div></div>'}
  /* atrasados do mesmo carro/pessoa ficam juntos: "Igor · Onix deve R$ X (N semanas)" — toque abre semana a semana */
  function grupos(l){var g={},ord=[],h='';l.forEach(function(o){var k=o.x?(o.x.kind+'|'+o.x.id):'av|'+o.av.id;if(!g[k]){g[k]=[];ord.push(k)}g[k].push(o)});
   ord.forEach(function(k){var it=g[k];if(it.length<2){h+=linha(it[0]);return}var x=it[0].x,nm=(x.motorista?primeiroNome(x.motorista)+' · ':'')+x.titulo;
-   h+='<div class="grpc"><div class="gh" onclick="var s=this.nextElementSibling;s.hidden=!s.hidden"><div class="av">'+esc((x.motorista||x.titulo).charAt(0).toUpperCase())+'</div><div class="g"><div class="t">'+esc(nm)+'</div><div class="s"><span class="neg">deve '+it.length+' semanas · desde '+dcurto(it[0].data)+'</span> · toque para ver</div></div><div class="v pos">'+c2s(tot(it))+'</div></div><div class="gs" hidden>'+it.map(linha).join('')+'</div></div>'});return h}
+   h+='<div class="grpc"><div class="gh" onclick="var s=this.nextElementSibling;s.hidden=!s.hidden"><div class="av">'+esc((x.motorista||x.titulo).charAt(0).toUpperCase())+'</div><div class="g"><div class="t">'+esc(nm)+'</div><div class="s"><span class="neg">deve '+it.length+' semanas · desde '+dcurto(it[0].data)+'</span> · toque para ver</div></div><div class="v pos">'+c2s(soma(it,function(o){return o.tot}))+'</div></div><div class="gs" hidden>'+it.map(linha).join('')+'</div></div>'});return h}
  var cob=its.filter(function(o){return o.data<t||(o.x&&o.x.status==='atrasado')}),prox=its.filter(function(o){return cob.indexOf(o)<0&&o.data<=lim}),dep=its.filter(function(o){return cob.indexOf(o)<0&&o.data>lim});
- function tot(l){return soma(l,function(o){return o.tot})}
+ function tot(l){return soma(l,function(o){return ehInc(o)?0:o.tot})}
+ function ehInc(o){return o.x?o.x.cert==='incerta':!!(o.av&&o.av.incerto)}
+ function totT(l){var a=tot(l),b=soma(l,function(o){return ehInc(o)?o.tot:0});return (a||!b?c2s(a):'')+(b?(a?' + ':'')+'<span class="warnc">'+c2s(b)+' incerto</span>':'')}
  var h='<div class="card"><h2>Para receber e cobrar</h2>';
- if(cob.length)h+='<div class="sub" style="margin:2px 0 2px"><b class="neg">Cobrar — já passou da data</b> · '+c2s(tot(cob))+'</div>'+grupos(cob);
- if(prox.length)h+='<div class="sub" style="margin:'+(cob.length?'12px':'2px')+' 0 2px"><b>Hoje e próximos 7 dias</b> · '+c2s(tot(prox))+'</div>'+prox.map(linha).join('');
- if(dep.length)h+='<div class="sub" style="margin:12px 0 2px"><b>Mais adiante</b> · '+c2s(tot(dep))+'</div>'+dep.map(linha).join('');
+ if(cob.length)h+='<div class="sub" style="margin:2px 0 2px"><b class="neg">Cobrar — já passou da data</b> · '+totT(cob)+'</div>'+grupos(cob);
+ if(prox.length)h+='<div class="sub" style="margin:'+(cob.length?'12px':'2px')+' 0 2px"><b>Hoje e próximos 7 dias</b> · '+totT(prox)+'</div>'+prox.map(linha).join('');
+ if(dep.length)h+='<div class="sub" style="margin:12px 0 2px"><b>Mais adiante</b> · '+totT(dep)+'</div>'+dep.map(linha).join('');
  return h+'<div class="sub" style="margin-top:6px">Círculo = recebi tudo hoje. Pagou parte, desconto ou outro dia: toque no nome.</div></div>'}
 /* ===== Agenda: Tudo · Entradas · Despesas (Hudson 03/11: "visualizar o que são as entradas do mês e as despesas do mês") ===== */
 function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas'],['resumo','Resumo']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
@@ -728,9 +731,10 @@ function vEntradas(){var it=itensMes(M),t=hoje();
  var ent=it.filter(function(x){return x.sinal>0&&x.kind!=='reemb'&&x.status!=='parado'&&x.status!=='adiantado'&&!adiadaVazia(x)&&!(x.kind==='lanc'&&/dívida/.test(x.titulo))&&!ehVenda(x)});
  var vendas=it.filter(ehVenda);
  var rec=soma(viv(S.lanc).filter(function(l){return ymOf(l.data)===M&&((l.tipo==='entrada'&&!ehVendaL(l))||l.tipo==='recavulsa')}),function(l){return l.valor});
- var prev=soma(ent,function(x){return x.resta||0}),atr=soma(ent.filter(function(x){return x.status==='atrasado'||(x.resta>0&&x.data<t)}),function(x){return x.resta||0});
+ var entS=ent.filter(function(x){return x.cert!=='incerta'}),incT=soma(ent.filter(function(x){return x.cert==='incerta'}),function(x){return x.resta||0});
+ var prev=soma(entS,function(x){return x.resta||0}),atr=soma(entS.filter(function(x){return x.status==='atrasado'||(x.resta>0&&x.data<t)}),function(x){return x.resta||0});
  var re=it.filter(function(x){return x.kind==='reemb'}),emp=it.filter(function(x){return x.kind==='lanc'&&/dívida/.test(x.titulo)});
- var h='<div class="card"><div class="tri"><div><span>Recebido</span><b class="pos">'+c2s(rec)+'</b></div><div><span>Falta receber</span><b>'+c2s(prev)+'</b></div><div><span>Total do mês</span><b>'+c2s(rec+prev)+'</b></div></div>'+(atr?'<div class="sub" style="margin-top:6px"><b class="neg">'+c2s(atr)+'</b> já venceu e não foi registrado.</div>':'')+'</div>';
+ var h='<div class="card"><div class="tri"><div><span>Recebido</span><b class="pos">'+c2s(rec)+'</b></div><div><span>Falta receber</span><b>'+c2s(prev)+'</b></div><div><span>Total do mês</span><b>'+c2s(rec+prev)+'</b></div></div>'+(atr?'<div class="sub" style="margin-top:6px"><b class="neg">'+c2s(atr)+'</b> já venceu e não foi registrado.</div>':'')+(incT?'<div class="sub" style="margin-top:6px">Fora da conta: <b class="warnc">'+c2s(incT)+' incerto</b> (pode não entrar).</div>':'')+'</div>';
  if(!ent.length)h+='<div class="card"><div class="empty">Nenhuma entrada neste mês.</div></div>';
  else h+='<div class="card">'+listaPorDia(ent)+'</div>';
  if(re.length||emp.length||vendas.length)h+='<div class="card"><h2>Entra no caixa, mas não é renda</h2>'+listaPorDia(re.concat(emp).concat(vendas))+'<div class="sub" style="margin-top:4px">Reembolso do seu pai, empréstimo e venda de carro entram no caixa, mas não são ganho do mês.</div></div>';
@@ -833,7 +837,10 @@ function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return 
    - o que é incerto aparece, mas fica FORA da conta. */
 function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),passado=ym<cur,futuro=ym>cur,ini=ym+'-01',ins=[],outs=[],inc=[];
  var ws=k.ws.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&x.multaInfo}),pS=0,rS=0,atr={};
- ws.forEach(function(x){var q=x.multaInfo;pS+=Math.max(0,q.devido-(q.abat||0))+(q.multa||0);rS+=q.rec||0;(q.carryL||[]).forEach(function(c){if(c.W<ini)atr[c.W]=Math.max(atr[c.W]||0,c.v)})});
+ var atrInc={};ws.forEach(function(x){var q=x.multaInfo,inc0=certCarro(car,q.inf,x.sem)==='incerta';
+  if(inc0){var fz=Math.max(0,q.devido-(q.abat||0)-(q.rec||0));pS+=q.rec||0;if(fz>0)inc.push({n:'Semana de '+dcurto(x.sem)+(q.inf&&q.inf.encerrado?' (contrato encerrado)':''),r:0,p:fz})}
+  else pS+=Math.max(0,q.devido-(q.abat||0))+(q.multa||0);
+  rS+=q.rec||0;(q.carryL||[]).forEach(function(c){if(c.W<ini){atr[c.W]=Math.max(atr[c.W]||0,c.v);if(inc0)atrInc[c.W]=1}})});
  if(ws.length||rS)ins.push({n:'Semanais ('+ws.length+' semana'+(ws.length!==1?'s':'')+')',r:rS,p:Math.max(pS,rS)});
  k.ext.forEach(function(l){var ent=l.tipo==='entrada'||l.tipo==='recavulsa';(ent?ins:outs).push({n:(l.desc||l.cat||'Lançamento')+' · '+dcurto(l.data),r:l.valor,p:l.valor})});
  viv(S.avulsas).forEach(function(a){if(a.carro!==car.id||ymOf(a.data)!==ym)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')}),function(l){return l.valor}),r=a.valor-pg;if(r<=0)return;
@@ -842,7 +849,7 @@ function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),pa
  if(k.manConsid)outs.push({n:'Manutenção (sua parte'+(k.abat?', menos o abatido no semanal':'')+')',r:k.manConsid,p:k.manConsid});
  k.docs.forEach(function(o){outs.push({n:o.nome+' (pago '+dcurto(o.pago)+')',r:o.valor,p:o.valor})});
  var tot=function(l,c){return soma(l,function(o){return o[c]})},iR=tot(ins,'r'),iP=tot(ins,'p'),oR=tot(outs,'r'),oP=tot(outs,'p'),ks=Object.keys(atr).sort(),atrT=soma(ks,function(w){return atr[w]});
- return {k:k,ins:ins,outs:outs,inc:inc,iR:iR,iP:iP,oR:oR,oP:oP,lR:iR-oR,lP:iP-oP,atr:atrT,atrW:ks,passado:passado,futuro:futuro}}
+ return {k:k,ins:ins,outs:outs,inc:inc,iR:iR,iP:iP,oR:oR,oP:oP,lR:iR-oR,lP:iP-oP,atr:atrT,atrW:ks,atrInc:ks.length>0&&ks.every(function(w){return atrInc[w]}),passado:passado,futuro:futuro}}
 function resCols(r){return r.futuro?['','No mês (previsto)']:r.passado?['Realizado','Previsto']:['Até hoje','No mês']}
 function resTabela(r,det){var c=resCols(r),one=r.futuro,cell=function(v,cls){return '<b class="'+(cls||'')+'">'+c2s(v)+'</b>'};
  var row=function(n,a,b,cls){return '<div class="rc'+(cls?' '+cls:'')+'"><span>'+n+'</span>'+(one?'':'<em>'+a+'</em>')+'<em>'+b+'</em></div>'};
@@ -853,7 +860,7 @@ function resTabela(r,det){var c=resCols(r),one=r.futuro,cell=function(v,cls){ret
  if(det)r.outs.forEach(function(o){h+=row(esc(o.n),c2s(o.r),c2s(o.p),'rcs')});
  h+=row('Lucro','<b class="'+(r.lR<0?'neg':'pos')+'">'+c2s(r.lR)+'</b>','<b class="'+(r.lP<0?'neg':'pos')+'">'+c2s(r.lP)+'</b>','rcl')+'</div>';
  var notas=[];
- if(r.atr>0){var m1=mesNome(ymOf(r.atrW[0])).split(' ')[0],m2=mesNome(ymOf(r.atrW[r.atrW.length-1])).split(' ')[0];notas.push('⏳ Atrasados de '+(m1===m2?m1:m1+' a '+m2)+' ainda a receber: <b>'+c2s(r.atr)+'</b> (são do mês deles, não entram neste lucro)')}
+ if(r.atr>0){var m1=mesNome(ymOf(r.atrW[0])).split(' ')[0],m2=mesNome(ymOf(r.atrW[r.atrW.length-1])).split(' ')[0];notas.push(r.atrInc?'❔ Atrasados de '+(m1===m2?m1:m1+' a '+m2)+' do contrato encerrado: <b>'+c2s(r.atr)+'</b> — incerto (são do mês deles, não entram neste lucro)':'⏳ Atrasados de '+(m1===m2?m1:m1+' a '+m2)+' ainda a receber: <b>'+c2s(r.atr)+'</b> (são do mês deles, não entram neste lucro)')}
  if(r.inc.length)notas.push('❔ Incerto, fora da conta: '+r.inc.map(function(o){return esc(o.n)+' '+c2s(o.p)}).join(' · '));
  if(notas.length)h+='<div class="sub" style="margin-top:6px;line-height:1.45">'+notas.join('<br>')+'</div>';
  return h}
@@ -861,11 +868,12 @@ function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas),nEx=viv(S.car
  if(EXT_ERRO)h+='<div class="alert bad"><i>⚠️</i><div>'+esc(EXT_ERRO)+'</div></div>';
  else if(!extChave())h+='<div class="alert inf tap" onclick="abrirConexao()"><i>🔗</i><div><b>Conectar ao Gestão e ao Multas</b>: as semanais saem dos contratos e você vê manutenções e débitos de cada carro.</div></div>';
  cs.forEach(function(car){var k=contaCarro(car,M),si=situacaoCarro(car),dc=extDocs(car),g=extCarro(car);
-  var sub=[];if(si.inf&&si.inf.contrato)sub.push(c2s(si.inf.contrato)+'/semana');if(si.inf&&si.inf.motorista)sub.push(primeiroNome(si.inf.motorista));else if(!usaGestao(car)&&car.motorista)sub.push(car.motorista);
+  var sub=[];if(si.semanal)sub.push(c2s(si.semanal)+'/semana');if(si.motorista)sub.push(usaGestao(car)?primeiroNome(si.motorista):si.motorista);
+  if(!si.ct&&si.fim&&usaGestao(car))sub.push('último motorista: '+primeiroNome(motoristaDoContrato(si.fim)));
   h+='<div class="card tap" onclick="abrirDetCarro(\''+car.id+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div class="mid">'+esc(car.nome)+'</div><span class="sub" style="font-size:20px">›</span></div>'+
-   '<div style="margin-top:4px"><span class="pill '+(si.ativo?'ok':'bad')+'">'+esc(si.st)+'</span>'+(si.ativo&&certCarro(car,si.inf,null)==='incerta'?' <span class="pill inc">'+(excluidoEm(car)||(car.gpk&&EXT.carros&&!extCarro(car))?'fora do Gestão':'sem contrato')+'</span>':'')+'</div>'+(sub.length?'<div class="sub" style="margin-top:5px">'+esc(sub.join(' · '))+'</div>':'');
+   '<div style="margin-top:4px"><span class="pill '+(si.ativo?'ok':'bad')+'">'+esc(si.st)+'</span>'+(car.gpk&&EXT.carros&&!extCarro(car)?' <span class="pill inc">fora do Gestão</span>':'')+'</div>'+(sub.length?'<div class="sub" style="margin-top:5px">'+esc(sub.join(' · '))+'</div>':'');
   if(k.ws.length)h+=semanasHtml('carro',car.id,k.ws);
-  var rr=resultadoCarro(car,M),lb=rr.passado?rr.lR:rr.lP;h+=resTabela(rr,false)+'<div style="margin-top:8px"><span class="pill '+(lb<0?'bad':'ok')+'">'+(lb<0?'No prejuízo':'Dando lucro')+(rr.passado?' em ':' no fechamento de ')+mesNome(M).split(' ')[0]+'</span> <span class="sub">· toque para ver a conta ›</span></div>';
+  var rr=resultadoCarro(car,M),lb=rr.passado?rr.lR:rr.lP;h+=resTabela(rr,false)+'<div style="margin-top:8px"><span class="pill '+(lb<0?'bad':lb>0?'ok':'')+'">'+(lb<0?'No prejuízo':lb>0?'Dando lucro':'Sem lucro nem prejuízo')+(rr.passado?' em ':' no fechamento de ')+mesNome(M).split(' ')[0]+'</span> <span class="sub">· toque para ver a conta ›</span></div>';
   var ext=[];if(k.man.length)ext.push('🔧 '+k.man.length+' manutenç'+(k.man.length>1?'ões':'ão')+' · sua parte '+c2s(k.manSua));if(k.docT)ext.push('📄 '+c2s(k.docT)+' pagos no Multas');
   if(ext.length)h+='<div class="sub" style="margin-top:4px">'+ext.join(' · ')+'</div>';
   else if(extChave()&&!g)h+='<div class="sub" style="margin-top:4px;color:var(--acc)">Ligar ao Gestão ›</div>';
@@ -879,7 +887,8 @@ function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas),nEx=viv(S.car
 function primeiroNome(n){var p=String(n||'').trim().split(/\s+/)[0]||'';return p?p.charAt(0).toUpperCase()+p.slice(1).toLowerCase():''}
 function abrirDetCarro(id){var car=carro(id),k=contaCarro(car,M),si=situacaoCarro(car),g=extCarro(car),dc=extDocs(car);
  var h='<h3>'+esc(car.nome)+'</h3><div class="sub">'+mesNome(M)+' · '+esc(si.st)+'</div>';
- if(usaGestao(car))h+='<div class="alert ok" style="margin-top:10px"><i>🔗</i><div>Semanais pelo contrato do Gestão'+(si.inf&&si.inf.motorista?' · '+esc(si.inf.motorista):'')+(si.inf&&si.inf.contrato?' · '+c2s(si.inf.contrato)+'/semana':'')+'. Sem contrato na semana, não há semanal.</div></div>';
+ if(usaGestao(car))h+=si.ct?'<div class="alert ok" style="margin-top:10px"><i>🔗</i><div>Semanais pelo contrato do Gestão · '+esc(si.motorista)+' · '+c2s(si.semanal)+'/semana. Sem contrato na semana, não há semanal.</div></div>'
+  :'<div class="alert inf" style="margin-top:10px"><i>🔗</i><div><b>Sem contrato vigente no Gestão</b>'+(si.fim?' — o contrato de '+esc(motoristaDoContrato(si.fim))+' terminou '+esc(dcurto(_iso(si.fim.encerradoEm)||_iso(si.fim.fim)))+'.':'.')+' Não há semanal a receber. O que ficou em aberto desse contrato aparece como <b>incerto</b> e fica fora da conta.</div></div>';
   var rr=resultadoCarro(car,M);h+='<div class="card"><h2>Como chegamos nesse número</h2>'+resTabela(rr,true)+'</div>';
  if(false)h+='<div class="card"><div class="kv"><span>Semanais do mês (contrato)</span><b>'+c2s(k.contrato)+'</b></div><div class="kv"><span>Recebido</span><b class="pos">'+c2s(k.rec)+'</b></div>'+(k.abat?'<div class="kv"><span>Abatido no semanal (manutenção)</span><b>'+c2s(k.abat)+'</b></div>':'')+
   k.custos.map(function(f){return '<div class="kv"><span>'+esc(f.nome)+'</span><b class="neg">'+c2s(valorFixa(f,M))+'</b></div>'}).join('')+
@@ -936,11 +945,19 @@ function carrosAtivos(){return viv(S.carros).filter(function(c){return !excluido
    Carro sem Gestão: rodando = provável; sem motorista = marcar "parado" (aí não tem semanal). */
 function certCarro(car,inf,W){var ex=excluidoEm(car);if(ex&&(!W||W>=ex))return 'incerta';
  if(car.gpk&&EXT.carros&&!extCarro(car))return 'incerta';
- if(usaGestao(car))return inf&&inf.contrato>0?'provavel':'incerta';
+ if(usaGestao(car)){if(inf&&inf.encerrado)return 'incerta';return inf&&inf.contrato>0?'provavel':'incerta'}
  return 'provavel'}
+/* Hudson 09/11: o carro só está "com contrato" se HOJE tem contrato vigente no Gestão. Contrato encerrado (termo de devolução,
+   encerrar contrato) = sem contrato, sem motorista, sem semanal. O que ficou em aberto desse contrato vira INCERTO (fora da conta). */
+function contratoAtual(car){if(!usaGestao(car))return null;var best=null;Object.keys(EXT.contratos||{}).forEach(function(id){var c=EXT.contratos[id];
+  if(!c||c.del||normPlaca(c.carro)!==car.gpk||c.status!=='vigente')return;if(!best||_iso(c.inicio)>_iso(best.inicio))best=c});return best}
+function ultimoEncerrado(car){var best=null;Object.keys(EXT.contratos||{}).forEach(function(id){var c=EXT.contratos[id];
+  if(!c||c.del||normPlaca(c.carro)!==car.gpk||c.status==='vigente'||c.status==='revogado'||!(_iso(c.encerradoEm)||_iso(c.fim)))return;if(!best||(_iso(c.encerradoEm)||_iso(c.fim))>(_iso(best.encerradoEm)||_iso(best.fim)))best=c});return best}
+function semanalDoContrato(c){return Math.round((c.tipo==='venda'?Number(c.venda&&c.venda.parcela)||0:Number(c.semanal)||0)*100)}
+function motoristaDoContrato(c){return c.apelido||(c.locatario&&c.locatario.nome)||''}
 function usaGestao(car){return !!(car&&car.gpk&&EXT.contratos&&car.fonte!=='manual')}
 function contratoNaSemana(car,W){var ini=addD(W,-6),best=null;Object.keys(EXT.contratos||{}).forEach(function(id){var c=EXT.contratos[id];if(!c||c.del||normPlaca(c.carro)!==car.gpk||c.status==='revogado')return;
-  var ci=_iso(c.inicio);if(!ci||ci>W)return;if(c.status!=='vigente'){var fe=_iso(c.encerradoEm);if(!fe||fe<ini)return}if(!best||ci>_iso(best.inicio))best=c});return best}
+  var ci=_iso(c.inicio);if(!ci||ci>W)return;if(c.status!=='vigente'){var fe=_iso(c.encerradoEm)||_iso(c.fim);if(!fe||fe<ini)return}if(!best||ci>_iso(best.inicio))best=c});return best}
 function semanaInfo(car,W){
  if(!usaGestao(car)){if(!(car.semanal>0))return null;if(parado(car,W))return {status:'parado',valor:0,contrato:car.semanal};return {status:'cobrar',valor:car.semanal,contrato:car.semanal,motorista:car.motorista||'',multaDia:car.multaDia||0}}
  var c=contratoNaSemana(car,W);if(!c)return {status:'semContrato',valor:0,contrato:0};
@@ -949,14 +966,14 @@ function semanaInfo(car,W){
  /* Hudson 03/11: se o motorista bateu, o carro fica na oficina e a semana continua contando ("cobrar na oficina" vale só para ESSA ida à oficina) */
  if(of&&car.cobraOficina==='atual'){car.cobraOficina=of;try{save()}catch(e){}}
  var cobraOf=of&&car.cobraOficina===of;
- if(of&&of<=W&&!cobraOf)return {status:'parado',valor:0,contrato:Math.round((Number(c.semanal)||0)*100),nota:'na oficina desde '+dcurto(of),oficina:of};
+ if(of&&of<=W&&!cobraOf)return {status:'parado',valor:0,contrato:Math.round((Number(c.semanal)||0)*100),nota:'na oficina desde '+dcurto(of),oficina:of,encerrado:c.status!=='vigente'&&!c.transferidoParaContrato};
  var sem=Math.round((c.tipo==='venda'?Number(c.venda&&c.venda.parcela)||0:Number(c.semanal)||0)*100);if(!sem)return {status:'semContrato',valor:0,contrato:0};
- var mot=c.apelido||(c.locatario&&c.locatario.nome)||'',ma=c.mesAdiantado,dia=Math.ceil(sem/700)*100,md=Math.round((Number(c.multaDiaria)||0)*100)||dia,qui=addD(W,-6),base={contrato:sem,motorista:mot,multaDia:md,venda:c.tipo==='venda'};
+ var mot=c.apelido||(c.locatario&&c.locatario.nome)||'',ma=c.mesAdiantado,dia=Math.ceil(sem/700)*100,md=Math.round((Number(c.multaDiaria)||0)*100)||dia,qui=addD(W,-6),base={contrato:sem,motorista:mot,multaDia:md,venda:c.tipo==='venda',encerrado:c.status!=='vigente'&&!c.transferidoParaContrato,fimCt:c.status!=='vigente'?(_iso(c.encerradoEm)||_iso(c.fim)):''};
  function ret(o){return Object.assign({},base,o)}
  if(ma&&Number(ma.valor)>0&&/^\d{4}-\d{2}-\d{2}$/.test(ma.fim||'')){if(W<=ma.fim)return ret({status:'adiantado',valor:0,nota:'mês pago adiantado até '+dcurto(ma.fim)});
   if(qui<=ma.fim){var n=diffD(ma.fim,W);return ret({status:'cobrar',valor:n*dia,nota:n+' diária'+(n>1?'s':'')+' depois do mês pago'})}}
  /* semana em que o contrato terminou: a semana final já foi paga adiantada na assinatura; sem semana antecipada, só as diárias usadas */
- var fe=c.status!=='vigente'?_iso(c.encerradoEm):'';
+ var fe=c.status!=='vigente'?(_iso(c.encerradoEm)||_iso(c.fim)):'';
  if(fe&&fe<W){if(c.antecipada&&c.tipo!=='venda')return ret({status:'adiantado',valor:0,nota:'semana final paga adiantada (contrato encerrado em '+dcurto(fe)+')'});var d1=diffD(qui,fe)+1;return ret({status:'cobrar',valor:Math.min(sem,d1*dia),nota:d1+' diária'+(d1>1?'s':'')+' até a devolução ('+dcurto(fe)+')'})}
  /* 1ª semana: contrato começou depois da quinta → só as diárias desde o início */
  var ci=_iso(c.inicio);if(ci&&ci>qui){var d2=diffD(ci,W)+1;if(d2<7)return ret({status:'cobrar',valor:Math.min(sem,d2*dia),nota:'1ª semana: '+d2+' diária'+(d2>1?'s':'')+' (contrato começou '+dsem(ci).slice(0,3)+' '+dbr(ci)+')'})}
@@ -996,8 +1013,14 @@ function passarSemana(id,sem,on){var key=id+'|'+sem,o=Object.assign({},S.semanas
  toast(on?car.nome+': '+c2s(k.resta)+' passou para a semana de '+dcurto(prox):car.nome+': voltou para a semana de '+dcurto(sem))}
 
 function situacaoCarro(car){var t=hoje(),g=extCarro(car),ws=semanasDoMes(ymOf(t),3).concat(semanasDoMes(addM(ymOf(t),1),3)).filter(function(w){return w>=t}),W=ws[0]||t,inf=semanaInfo(car,W);
- var st=usaGestao(car)?(inf&&inf.status!=='semContrato'?(inf.venda?'compra e venda':'com contrato'):'sem contrato'):(paradaAberta(car)?'parado':'rodando');
- if(g&&g.oficinaDesde)st+=' · '+statusGestao(g);return {st:st,inf:inf,ativo:!!(inf&&inf.status!=='semContrato'&&inf.status!=='parado'),W:W}}
+ if(!usaGestao(car)){var st0=paradaAberta(car)?'parado':'rodando';if(g&&g.oficinaDesde)st0+=' · '+statusGestao(g);
+  return {st:st0,inf:inf,ativo:!!(inf&&inf.status!=='semContrato'&&inf.status!=='parado'),W:W,semanal:inf&&inf.contrato||0,motorista:(inf&&inf.motorista)||car.motorista||''}}
+ var ct=contratoAtual(car),fim=ct?null:ultimoEncerrado(car),st,ci=ct?_iso(ct.inicio):'';
+ if(ct)st=(ct.tipo==='venda'?'compra e venda':'com contrato')+(ci>t?' · começa '+dcurto(ci):'');
+ else st='sem contrato'+(fim?' desde '+dcurto(_iso(fim.encerradoEm)||_iso(fim.fim)):'');
+ if(g&&g.oficinaDesde)st+=' · '+statusGestao(g);
+ return {st:st,inf:inf,ct:ct,fim:fim,ativo:!!(ct&&inf&&inf.status!=='semContrato'&&inf.status!=='parado'),W:W,
+  semanal:ct?semanalDoContrato(ct):0,motorista:ct?motoristaDoContrato(ct):''}}
 function extManut(car,ym){var out={mes:[]};if(!car||!car.gpk||!EXT.manut)return out;
  Object.keys(EXT.manut).forEach(function(id){var m=EXT.manut[id];if(!m||normPlaca(m.carro)!==car.gpk)return;
   /* Hudson 08/11: cada item no mês da SUA competência (peça na data dela, mão de obra na data do serviço), igual ao fechamento do Gestão */
@@ -1044,7 +1067,7 @@ function extSync(manual){var k=extChave();if(!k||EXT_RODANDO)return;EXT_RODANDO=
   var mv={};Object.keys(mul).forEach(function(id){var v=mul[id];if(!v)return;var k3=normPlaca(v.placa);if(!meus[k3])return;var arr=function(a){return Array.isArray(a)?a.filter(Boolean):Object.values(a||{}).filter(Boolean)};
    mv[k3]={debitos:arr(v.debitos).map(function(d){return {tipo:d.tipo,ano:d.ano,valor:d.valor,venc:d.venc,pagoEm:d.pagoEm,obs:d.obs}}),multas:arr(v.multas).map(function(m){return {data:m.data,valor:m.valor,obs:m.obs,pagaEm:m.pagaEm||null}})}});
   var cc={};Object.keys(cts).forEach(function(id){var c=cts[id];if(!c||!meus[normPlaca(c.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(c.editadoEm)||Number(c.criadoEm)||0))return;
-   cc[id]={carro:c.carro,tipo:c.tipo||'locacao',status:c.status||'vigente',inicio:c.inicio||'',fim:c.fim||'',encerradoEm:c.encerradoEm||'',semanal:c.semanal||0,venda:c.venda?{parcela:c.venda.parcela||0}:null,apelido:c.apelido||'',locatario:{nome:(c.locatario&&c.locatario.nome)||''},mesAdiantado:c.mesAdiantado||null,multaDiaria:Number(c.multaDiaria)||0,antecipada:!!String(c.cl34||'').trim()&&!(Number(c.semanaAntecipadaTransferidaValor)>0)}});
+   cc[id]={carro:c.carro,tipo:c.tipo||'locacao',status:c.status||'vigente',inicio:c.inicio||'',fim:c.fim||'',encerradoEm:c.encerradoEm||'',semanal:c.semanal||0,venda:c.venda?{parcela:c.venda.parcela||0}:null,apelido:c.apelido||'',locatario:{nome:(c.locatario&&c.locatario.nome)||''},mesAdiantado:c.mesAdiantado||null,multaDiaria:Number(c.multaDiaria)||0,antecipada:!!String(c.cl34||'').trim()&&!(Number(c.semanaAntecipadaTransferidaValor)>0),transferidoParaContrato:c.transferidoParaContrato||''}});
   EXT={em:Date.now(),carros:cs,manut:mm,multas:mv,contratos:cc,excluidos:exc};try{localStorage.setItem(EXT_KEY,JSON.stringify(EXT))}catch(e){}
   EXT_ERRO='';EXT_RODANDO=false;render();if(manual)toast('Gestão e Multas atualizados')})
  .catch(function(e){EXT_RODANDO=false;EXT_ERRO=(e&&e.message)||'Não consegui ler o Gestão';if(/permission|denied/i.test(EXT_ERRO))EXT_ERRO='O banco recusou a leitura. Confira a chave da família.';render();if(manual)toast('⚠️ '+EXT_ERRO)})}
@@ -1261,6 +1284,7 @@ function abrirSemanaCarro(id,sem,lid,form){if(precisaConta())return;var car=carr
  if(k.pago>0)linhas.push(['Já recebido','−'+c2s(k.pago)]);
  h+='<div class="card" style="margin-top:10px"><div class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;font-size:11.5px">'+(k.resta>0?'Falta receber':'Situação')+'</div><div style="font-size:30px;font-weight:800;margin:2px 0 6px" class="'+(k.resta>0?'':'pos')+'">'+(k.resta>0?c2s(k.resta):'✓ Semana paga')+'</div>'+
   (linhas.length>1||k.aj.valor!=null?linhas.map(function(r){return '<div class="kv sub" style="padding:3px 0"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>'}).join(''):'<div class="sub">'+(inf.nota?esc(inf.nota):'pelo contrato')+'</div>')+'</div>';
+ if(k.resta>0&&inf.encerrado)h+='<div class="sub" style="margin:-4px 2px 8px">❔ O contrato'+(inf.motorista?' de '+esc(primeiroNome(inf.motorista)):'')+' terminou'+(inf.fimCt?' em '+dcurto(inf.fimCt):'')+' (Gestão). Este valor está como <b>incerto</b> e fica fora da conta até entrar.</div>';
  if(k.devido>0&&k.cobra&&k.multa===0&&k.resta>0&&agoraMom()<=sem+'T12:00')h+='<div class="sub" style="margin:-4px 2px 8px">Vence '+dsem(sem)+' '+dbr(sem)+' às 12h. Depois disso entra multa de '+c2s(k.md)+' por dia (até domingo).</div>';
  var abreForm=!!(ed||form);
  if(k.resta>0&&!abreForm){
