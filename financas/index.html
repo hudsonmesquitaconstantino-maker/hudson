@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=39, APP_DATE='08/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=40, APP_DATE='09/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1038,9 +1038,9 @@ function extSync(manual){var k=extChave();if(!k||EXT_RODANDO)return;EXT_RODANDO=
   syncNomesGestao(cs);
   var meus={};viv(S.carros).forEach(function(c){if(c.gpk)meus[c.gpk]=1});
   var mm={};Object.keys(man).forEach(function(id){var m=man[id];if(!m||!meus[normPlaca(m.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(m.editadoEm)||Number(m.criadoEm)||0))return;
-   mm[id]={carro:m.carro,dataIni:m.dataIni||'',dataFim:m.dataFim||'',divMot:m.divMot,motorista:m.motorista||'',texto:String(m.texto||'').slice(0,200),total:m.total||0,
-    pecas:(Array.isArray(m.pecas)?m.pecas:Object.values(m.pecas||{})).map(function(p){return {valor:p&&p.valor,desc:p&&p.desc,pendenteFinanceiro:!!(p&&p.pendenteFinanceiro)}}),
-    blocos:(Array.isArray(m.blocos)?m.blocos:Object.values(m.blocos||{})).map(function(b){return {valor:b&&b.valor,nome:b&&b.nome,titulo:b&&b.titulo,servicos:(b&&Array.isArray(b.servicos))?b.servicos.slice(0,3):[],pendenteFinanceiro:!!(b&&b.pendenteFinanceiro)}})}});
+   mm[id]={carro:m.carro,dataIni:m.dataIni||'',dataFim:m.dataFim||'',divMot:m.divMot,motorista:m.motorista||'',texto:String(m.texto||'').slice(0,200),total:m.total||0,dataPecasPadrao:m.dataPecasPadrao||'',
+    pecas:(Array.isArray(m.pecas)?m.pecas:Object.values(m.pecas||{})).map(function(p){return {valor:p&&p.valor,desc:p&&p.desc,data:(p&&p.data)||'',pendenteFinanceiro:!!(p&&p.pendenteFinanceiro)}}),
+    blocos:(Array.isArray(m.blocos)?m.blocos:Object.values(m.blocos||{})).map(function(b){return {valor:b&&b.valor,nome:b&&b.nome,titulo:b&&b.titulo,servicos:(b&&Array.isArray(b.servicos))?b.servicos.slice(0,3):[],dataIni:(b&&b.dataIni)||'',dataFim:(b&&b.dataFim)||'',pendenteFinanceiro:!!(b&&b.pendenteFinanceiro)}})}});
   var mv={};Object.keys(mul).forEach(function(id){var v=mul[id];if(!v)return;var k3=normPlaca(v.placa);if(!meus[k3])return;var arr=function(a){return Array.isArray(a)?a.filter(Boolean):Object.values(a||{}).filter(Boolean)};
    mv[k3]={debitos:arr(v.debitos).map(function(d){return {tipo:d.tipo,ano:d.ano,valor:d.valor,venc:d.venc,pagoEm:d.pagoEm,obs:d.obs}}),multas:arr(v.multas).map(function(m){return {data:m.data,valor:m.valor,obs:m.obs,pagaEm:m.pagaEm||null}})}});
   var cc={};Object.keys(cts).forEach(function(id){var c=cts[id];if(!c||!meus[normPlaca(c.carro)])return;var t=Number(apag[id])||0;if(t&&t>=(Number(c.editadoEm)||Number(c.criadoEm)||0))return;
