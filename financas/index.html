@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=38, APP_DATE='07/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=39, APP_DATE='08/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1000,10 +1000,13 @@ function situacaoCarro(car){var t=hoje(),g=extCarro(car),ws=semanasDoMes(ymOf(t)
  if(g&&g.oficinaDesde)st+=' · '+statusGestao(g);return {st:st,inf:inf,ativo:!!(inf&&inf.status!=='semContrato'&&inf.status!=='parado'),W:W}}
 function extManut(car,ym){var out={mes:[]};if(!car||!car.gpk||!EXT.manut)return out;
  Object.keys(EXT.manut).forEach(function(id){var m=EXT.manut[id];if(!m||normPlaca(m.carro)!==car.gpk)return;
-  var v=0;(m.pecas||[]).forEach(function(p){if(p&&!p.pendenteFinanceiro)v+=Number(p.valor)||0});(m.blocos||[]).forEach(function(b){if(b&&!b.pendenteFinanceiro)v+=Number(b.valor)||0});if(!v)v=Number(m.total)||0;v=Math.round(v*100);if(!v)return;
+  /* Hudson 08/11: cada item no mês da SUA competência (peça na data dela, mão de obra na data do serviço), igual ao fechamento do Gestão */
+  var leg=_iso(m.dataFim)||_iso(m.dataIni),v=0,tem=false;(m.pecas||[]).forEach(function(p){if(p&&!p.pendenteFinanceiro){tem=true;if(ymOf(_iso(p.data)||_iso(m.dataPecasPadrao)||leg)===ym)v+=Number(p.valor)||0}});
+  (m.blocos||[]).forEach(function(b){if(b&&!b.pendenteFinanceiro){tem=true;if(ymOf(_iso(b.dataFim)||_iso(b.dataIni)||leg)===ym)v+=Number(b.valor)||0}});
+  if(!tem&&ymOf(leg)===ym)v=Number(m.total)||0;v=Math.round(v*100);if(!v)return;
   var dv=(m.divMot===0||m.divMot===50||m.divMot===100)?m.divMot:((String(m.motorista||'').trim()&&!/guimas/i.test(m.motorista))?50:0);
   var b0=(m.blocos||[])[0]||{},tit=(b0.servicos&&b0.servicos[0])||String(m.texto||'').split('\n')[0]||((m.pecas||[])[0]||{}).desc||'Manutenção';
-  var d=_iso(m.dataFim)||_iso(m.dataIni);if(!d||ymOf(d)!==ym)return;
+  var d=leg&&ymOf(leg)===ym?leg:ym+'-01';
   out.mes.push({id:id,tot:v,sua:Math.round(v*(100-dv)/100),dv:dv,data:d,titulo:tit,oficina:b0.nome||''})});
  out.mes.sort(function(a,b){return a.data<b.data?1:-1});return out}
 /* Débitos e multas do app Multas (Hudson 03/11): o que está em aberto NÃO é despesa do mês — só aparece como aviso no carro.
