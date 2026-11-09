@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=43, APP_DATE='09/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=44, APP_DATE='09/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -292,18 +292,39 @@ function arredPai(v){var c=((v%100)+100)%100,r=(v-c)/100;return (c>50?r+1:r)*100
 /* texto para mandar ao pai pelo WhatsApp (Hudson 03/11 (3)): TODAS as parcelas dele, mês a mês, a partir desta fatura,
    no formato que ele usa: "*Cartão Hudson Todo dia 24*" e "• Novembro: *R$ 3.454*". Cada mês = parte do pai naquela fatura
    (valor informado + compras novas marcadas "do pai", já arredondadas). Mês sem parcela dele não aparece. */
-function textoPai(cid,ym){var c=viv(S.cartoes).filter(function(c){return c.id===cid})[0]||{},ms=[];
- for(var i=0;i<36;i++){var m=addM(ym,i),x=fatura(cid,m);if(x.pai>0)ms.push(x)}
- var outros=viv(S.cartoes).some(function(o){if(o.id===cid)return false;for(var i=0;i<36;i++){if(fatura(o.id,addM(ym,i)).pai>0)return true}return false});
+/* ===== Hudson 09/11: CONTA DO PAI — a parte do pai de QUALQUER cartão vai para uma conta só, que segue o ITAÚ:
+   fecha no dia de fechamento do Itaú (comprou no dia do fechamento = próxima) e vence no dia de vencimento dele (24).
+   Ex.: comprou no Bradesco dia 09/11 (Itaú fecha 17): o pai paga em 24/11, mesmo a fatura do Bradesco vencendo 01/12.
+   Parcelado: uma parcela por mês, todo dia 24. A fatura de cada cartão continua igual (total, sua parte, parte do pai).
+   Nenhum valor salvo muda: só a data em que o pai devolve e o agrupamento. ===== */
+function cartaoPai(){var c=S.paiCartao?cartao(S.paiCartao):null;if(c&&!c.del)return c;return viv(S.cartoes).filter(function(c){return /ita[uú]/i.test(c.nome||'')})[0]||null}
+/* valor antigo da parte do pai digitado numa fatura de outro cartão: vai para a conta do pai que vence antes dessa fatura */
+function _mesPaiFat(ref,cid,X){if(!ref||cid===ref.id)return X;var c=cartao(cid),cv=diaNoMes(X,c?(+c.vence||1):1),P=ymOf(cv);if(diaNoMes(P,+ref.vence||1)>cv)P=addM(P,-1);return P}
+/* compra do pai: mês pela data da compra no ciclo do Itaú; parcela N vai N-1 meses depois */
+function _mesPaiIt(ref,cid,X,i){if(!ref||cid===ref.id||i.kind!=='lanc')return X;return addM(faturaDe(ref,i.l.data),(+i.i||1)-1)}
+function reembMes(l){var r=String(l.ref||'');if(r.indexOf('pai|')===0)return r.slice(4);var p=r.split('|');if(p.length===2)return _mesPaiFat(cartaoPai(),p[0],p[1]);return ymOf(l.data)}
+function contaPai(P){var ref=cartaoPai(),its=[],bases=[];
+ viv(S.cartoes).forEach(function(c){for(var d=-2;d<=2;d++){var X=addM(P,d),f=S.faturas[c.id+'|'+X]||{},tb=f.pai!=null;
+  if(tb&&f.pai>0&&_mesPaiFat(ref,c.id,X)===P)bases.push({c:c,ym:X,v:f.pai});
+  itensFatura(c.id,X).forEach(function(i){if(!i.pai||(tb&&i.l&&i.l.imp))return;if(_mesPaiIt(ref,c.id,X,i)!==P)return;its.push({c:c,ym:X,i:i,v:arredPai(i.v)})})}});
+ its.sort(function(a,b){return a.i.data<b.i.data?1:a.i.data>b.i.data?-1:((b.i.l&&b.i.l.criado)||0)-((a.i.l&&a.i.l.criado)||0)});
+ var total=soma(bases,function(b){return b.v})+soma(its,function(o){return o.v}),porC={};bases.concat(its).forEach(function(o){porC[o.c.id]=(porC[o.c.id]||0)+o.v});
+ var rs=viv(S.lanc).filter(function(l){return l.tipo==='reembolso'&&reembMes(l)===P}),rec=soma(rs,function(l){return l.valor});
+ return {P:P,ref:ref,vence:diaNoMes(P,ref?(+ref.vence||1):24),total:total,its:its,bases:bases,porC:porC,reembs:rs,rec:rec,resta:Math.max(0,total-rec)}}
+/* em qual conta do pai cai a parte do pai desta fatura de cartão: {mês: valor} */
+function paiDaFatura(cid,X){var ref=cartaoPai(),f=S.faturas[cid+'|'+X]||{},tb=f.pai!=null,o={};
+ if(tb&&f.pai>0){var p0=_mesPaiFat(ref,cid,X);o[p0]=(o[p0]||0)+f.pai}
+ itensFatura(cid,X).forEach(function(i){if(!i.pai||(tb&&i.l&&i.l.imp))return;var P=_mesPaiIt(ref,cid,X,i);o[P]=(o[P]||0)+arredPai(i.v)});return o}
+function textoPai(P){var ref=cartaoPai(),ms=[];for(var i=0;i<36;i++){var cp=contaPai(addM(P,i));if(cp.total>0)ms.push(cp)}
  var R=function(v){return 'R$ '+Math.round(v/100).toLocaleString('pt-BR')},longo=ms.length>12;
- var L=['*Cartão Hudson'+(outros&&c.nome?' ('+c.nome+')':'')+' Todo dia '+(+c.vence||1)+'*',''];
- ms.forEach(function(x){var n=MESES[+x.ym.slice(5,7)-1];n=n.charAt(0).toUpperCase()+n.slice(1)+(longo?'/'+x.ym.slice(2,4):'');
-  L.push('• '+n+': *'+R(x.pai)+'*'+(x.reemb>0?(x.paiPend>0?' (já devolveu '+R(x.reemb)+', falta '+R(x.paiPend)+')':' ✅ pago'):''))});
+ var L=['*Cartão Hudson Todo dia '+(ref?(+ref.vence||1):24)+'*',''];
+ ms.forEach(function(x){var n=MESES[+x.P.slice(5,7)-1];n=n.charAt(0).toUpperCase()+n.slice(1)+(longo?'/'+x.P.slice(2,4):'');
+  L.push('• '+n+': *'+R(x.total)+'*'+(x.rec>0?(x.resta>0?' (já devolveu '+R(x.rec)+', falta '+R(x.resta)+')':' ✅ pago'):''))});
  return L.join('\n')}
-function copiarPai(cid,ym){var t=textoPai(cid,ym);function ok(){toast('Copiado: é só colar no WhatsApp do seu pai')}
+function copiarPai(P){var t=textoPai(P);function ok(){toast('Copiado: é só colar no WhatsApp do seu pai')}
  try{navigator.clipboard.writeText(t).then(ok,function(){fb()})}catch(e){fb()}
  function fb(){var a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{document.execCommand('copy');ok()}catch(e){toast('Não consegui copiar')}a.remove()}}
-function aReceberPai(){var t=0;viv(S.cartoes).forEach(function(c){for(var i=-6;i<=6;i++){var ym=addM(ymOf(hoje()),i);if(ym<S.inicio&&!S.faturas[c.id+'|'+ym])continue;t+=fatura(c.id,ym).paiPend}});return t}
+function aReceberPai(){var t=0;for(var i=-6;i<=6;i++){var ym=addM(ymOf(hoje()),i);t+=contaPai(ym).resta}return t}
 
 /* ---------- contas fixas, carros, rendas ---------- */
 function fixaMes(f,ym){var k=f.id+'|'+ym,v=valorFixa(f,ym),pags=viv(S.lanc).filter(function(l){return l.tipo==='pagfixa'&&l.ref===k}),pago=soma(pags,function(l){return l.valor});
@@ -330,7 +351,8 @@ function itensMes(ym){
   out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,semData:x.semData,sinal:-1,valor:x.valor,resta:x.resta,cert:'certo',titulo:f.nome,status:x.resta<=0?'pago':(atras(x.due)?'atrasado':'pendente')})});
  viv(S.cartoes).forEach(function(c){var x=fatura(c.id,ym);if(x.valor<=0&&!x.informado)return;
   out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor,resta:x.resta,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:x.resta<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:x.pai});
-  if(x.pai>0)out.push({kind:'reemb',id:c.id,ym:ym,data:x.vence,sinal:1,valor:x.pai,resta:x.paiPend,cert:'provavel',titulo:'Reembolso do seu pai ('+c.nome+')',status:x.paiPend<=0?'pago':'pendente'})});
+});
+ (function(){var cp=contaPai(ym);if(cp.total>0)out.push({kind:'reemb',id:'pai',ym:ym,data:cp.vence,sinal:1,valor:cp.total,resta:cp.resta,cert:'provavel',titulo:'Reembolso do seu pai (cartões)',status:cp.resta<=0?'pago':'pendente'})})();
  viv(S.carros).forEach(function(car){var ug=usaGestao(car);if(!ug&&!(car.semanal>0))return;semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){
   var ex=excluidoEm(car);if(ex&&s>=ex&&!recebSemana('carro',car.id,s).length)return;
   var k=contaSemana(car,s);if(!k)return;var inf=k.inf;
@@ -442,7 +464,8 @@ function pillStatus(x,proj){
  return ''}
 function acaoItem(x){switch(x.kind){
  case 'fixa':return "abrirUni('fixa','"+x.id+"','"+x.ym+"')";
- case 'fatura':case 'reemb':return "abrirFatura('"+x.id+"','"+x.ym+"')";
+ case 'fatura':return "abrirFatura('"+x.id+"','"+x.ym+"')";
+ case 'reemb':return "abrirContaPai('"+x.ym+"')";
  case 'carro':return "abrirUni('carro','"+x.id+"','"+x.sem+"')";
  case 'multa':return "abrirSemana('carro','"+x.id+"','"+x.sem+"')";
  case 'renda':return "abrirUni('renda','"+x.id+"','"+x.sem+"')";
@@ -506,7 +529,8 @@ function quickAcao(x){
   case 'renda':return "receberRenda('"+x.id+"','"+x.sem+"')";
   case 'fixa':return "pagarRapido('fixa','"+x.id+"','"+x.ym+"')";
   case 'fatura':return "pagarRapido('fatura','"+x.id+"','"+x.ym+"')";
-  case 'avulsa':return "pagarRapido('avulsa','"+x.id+"','')"}
+  case 'avulsa':return "pagarRapido('avulsa','"+x.id+"','')";
+  case 'reemb':return "receberPai('"+x.ym+"')"}
  return ''}
 function ckHtml(x,q){if(q==null)q=quickAcao(x);
  if(x&&x.status==='pago')return '<button class="ck on" aria-label="Ver o que foi registrado" onclick="event.stopPropagation();'+acaoItem(x)+'">✓</button>';
@@ -657,8 +681,8 @@ function heroMes(p,fim){var cs=viv(S.contas),mes=mesNome(ymOf(hoje())).split(' '
  var dF=p.dias[fim]||{saldo:p.saldo},f=dF.saldo,neg=f<0,mn=null,mnD=null;Object.keys(p.dias).forEach(function(d){if(d<=fim&&(mn==null||p.dias[d].saldo<mn)){mn=p.dias[d].saldo;mnD=d}});
  h+='<div class="strip"><div class="ico">'+(neg?'!':'✓')+'</div><div><b>'+mes+' fecha '+(neg?'negativo: faltam ':'positivo: sobram ')+c2s(Math.abs(f))+'</b><span>'+
   (!neg&&mn<0?'mas fica negativo em '+dcurto(mnD)+' ('+c2s(mn)+') antes de entrar dinheiro':neg&&p.entrasInc>0?'se o incerto entrar ('+c2s(p.entrasInc)+'): '+(f+p.entrasInc<0?'ainda faltam '+c2s(-(f+p.entrasInc)):'sobram '+c2s(f+p.entrasInc)):'conta com o que é provável entrar até '+dcurto(fim))+'</span></div></div>';
- var ymA=ymOf(hoje()),pe=viv(S.cartoes).map(function(c){var x=fatura(c.id,ymA);return x.paiPend>0?x:null}).filter(Boolean);
- if(pe.length)h+='<div class="det" style="margin-top:8px">Seu pai devolve '+c2s(soma(pe,function(x){return x.paiPend}))+' este mês ('+pe.map(function(x){return x.nome+' '+dcurto(x.vence)}).join(', ')+') · não é renda</div>';
+ var cpA=contaPai(ymOf(hoje()));
+ if(cpA.resta>0)h+='<div class="det" style="margin-top:8px">Seu pai devolve '+c2s(cpA.resta)+' em '+dcurto(cpA.vence)+' (parte dele em todos os cartões) · não é renda</div>';
  return h.replace('<div class="hero">','<div class="hero tap" onclick="abrirSaldo()">')+'</div>'}
 /* o dia mais próximo em que falta dinheiro (só aparece se faltar) — Hudson 03/11 */
 /* Hudson 03/11 (2): olha 90 dias; se não faltar, mostra numa linha até quando está coberto e qual é o dia mais apertado */
@@ -709,7 +733,7 @@ function blocoReceber(){var t=hoje(),lim=addD(t,7),its=[];
  if(dep.length)h+='<div class="sub" style="margin:12px 0 2px"><b>Mais adiante</b> · '+totT(dep)+'</div>'+dep.map(linha).join('');
  return h+'<div class="sub" style="margin-top:6px">Círculo = recebi tudo hoje. Pagou parte, desconto ou outro dia: toque no nome.</div></div>'}
 /* ===== Agenda: Tudo · Entradas · Despesas (Hudson 03/11: "visualizar o que são as entradas do mês e as despesas do mês") ===== */
-function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas'],['resumo','Resumo']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
+function segAg(){return '<div class="seg">'+[['tudo','Agenda'],['entradas','Entradas'],['despesas','Despesas'],['compras','Compras'],['resumo','Resumo']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';window.scrollTo(0,0);render()">'+o[1]+'</button>'}).join('')+'</div>'}
 /* lista agrupada por dia, com a data em cima de cada grupo (igual à Agenda) */
 /* Hudson 07/11: pagamento PARCIAL vira linha própria na agenda, no dia em que entrou ("Parcial · Multa", "Parcial semanal · Mobi"),
    e o item mostra só o que falta. Só muda a LISTA — nenhuma conta/soma usa isto. */
@@ -779,7 +803,38 @@ function vDespesas(){var it=itensMes(M),t=hoje();
  if(!ds.length)h+='<div class="card"><div class="empty">Nenhuma despesa neste mês.</div></div>';
  else h+='<div class="card"><h2>Contas e gastos</h2>'+listaPorDia(ds)+'</div>';
  return h}
-function vAgenda(){if(AG==='entradas')return mnav()+segAg()+vEntradas();if(AG==='resumo')return mnav()+segAg()+vResumo();if(AG==='despesas')return mnav()+segAg()+vDespesas();
+/* ===== Hudson 09/11: COMPRAS DO MÊS — o que você comprou no mês, pela DATA DA COMPRA (não pela fatura).
+   Mais recente em cima. Cartão ou Pix, categoria, parcelas. Porcentagem por categoria do que comprou.
+   E, à parte, as faturas que vencem neste mês (o que você paga dos cartões agora). Só mostra: nenhum valor muda. ===== */
+var _cmpTodas=0;
+function comprasMes(ym){return viv(S.lanc).filter(function(l){return l.tipo==='gasto'&&ymOf(l.data)===ym}).map(function(l){
+  var car=ehCartao(l.meio),n=Math.max(1,+l.parc||1),v=Number(l.valor)||((Number(l.vParc)||0)*n);
+  return {l:l,v:v,n:n,cartao:car,cat:l.cat||(car?'A classificar':'Outros'),pai:l.de==='pai'}})
+ .sort(function(a,b){return a.l.data!==b.l.data?(a.l.data<b.l.data?1:-1):((b.l.criado||0)-(a.l.criado||0))})}
+function vCompras(){var cs=comprasMes(M),meu=cs.filter(function(x){return !x.pai}),pai=cs.filter(function(x){return x.pai});
+ var tot=soma(meu,function(x){return x.v}),noCar=soma(meu.filter(function(x){return x.cartao}),function(x){return x.v}),porCat={};
+ meu.forEach(function(x){porCat[x.cat]=(porCat[x.cat]||0)+x.v});var ks=Object.keys(porCat).sort(function(a,b){return porCat[b]-porCat[a]});
+ var nm=mesNome(M).split(' ')[0];
+ var h='<div class="card"><div class="sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;font-size:11.5px">Você comprou em '+esc(nm)+'</div><div class="big" style="margin:2px 0 4px">'+c2s(tot)+'</div>'+
+  '<div class="sub">'+meu.length+' compra'+(meu.length!==1?'s':'')+(tot?' · no cartão '+c2s(noCar)+' · Pix/débito '+c2s(tot-noCar):'')+'</div>';
+ var mostra=window._cmpTodas||ks.length<=5?ks:ks.slice(0,4);
+ if(ks.length)h+='<div class="hr"></div>'+mostra.map(function(k){var v=porCat[k],pc=tot?v/tot*100:0;return '<div class="catr"><div class="kv"><span>'+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+(pc>0&&pc<1?'<1':Math.round(pc))+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('')+
+  (ks.length>mostra.length?'<div class="sub tap" style="margin-top:6px;color:var(--acc);font-weight:650" onclick="_cmpTodas=1;render()">+ '+(ks.length-mostra.length)+' outras categorias ('+c2s(soma(ks.slice(mostra.length),function(k){return porCat[k]}))+') ›</div>':'');
+ h+='<div class="sub" style="margin-top:8px">Pela data da compra. Parcelado entra com o valor total no mês em que comprou.'+(pai.length?' Compras do seu pai ('+c2s(soma(pai,function(x){return x.v}))+') ficam fora: ele devolve.':'')+'</div></div>';
+ /* lista: mais recente em cima, agrupada por dia */
+ if(!cs.length)h+='<div class="card"><div class="empty">Nenhuma compra lançada em '+esc(nm)+'.</div></div>';
+ else{var t=hoje(),dias={},ord=[];cs.forEach(function(x){var d=x.l.data;if(!dias[d]){dias[d]=[];ord.push(d)}dias[d].push(x)});
+  h+='<div class="card"><h2>Compras recentes</h2>'+ord.map(function(d){var dt=soma(dias[d].filter(function(x){return !x.pai}),function(x){return x.v});
+   return '<div class="dayh'+(d===t?' hoje':'')+'"><span>'+(d===t?'Hoje · ':'')+esc(dlab(d))+'</span>'+(dt?'<span class="sd">'+c2s(dt)+'</span>':'')+'</div>'+dias[d].map(function(x){var l=x.l,k=x.cartao?cartao(l.meio):null,c=k?null:conta(l.meio);
+    var onde=k?'💳 '+k.nome:'Pix · '+(c?c.nome:'conta'),sub=[onde,x.cat];if(x.n>1)sub.push(x.n+'x de '+c2s(parcV(x.v,x.n,0)));if(x.pai)sub.push('do seu pai');
+    return '<div class="row tap'+(x.pai?' muted':'')+'" onclick="abrirLanc(\''+l.id+'\')"><div class="g"><div class="t">'+esc(l.desc||x.cat)+'</div><div class="s">'+esc(sub.join(' · '))+'</div></div><div class="v">'+c2s(x.v)+'</div></div>'}).join('')}).join('')+'</div>'}
+ /* faturas que vencem neste mês */
+ var fs=viv(S.cartoes).map(function(c){return fatura(c.id,M)}).filter(function(x){return x.valor>0||x.pago>0});
+ if(fs.length){var fT=soma(fs,function(x){return x.valor}),fR=soma(fs,function(x){return x.resta});
+  h+='<div class="card"><h2>Faturas que vencem em '+esc(nm)+'</h2>'+fs.map(function(x){return '<div class="row tap" onclick="abrirFatura(\''+x.cid+'\',\''+M+'\')"><div class="bub card">💳</div><div class="g"><div class="t">'+esc(x.nome)+'</div><div class="s">vence '+esc(dcurto(x.vence))+(x.pai>0?' · seu pai '+c2s(x.pai):'')+'</div></div><div class="v">'+c2s(x.valor)+'<small>'+(x.resta<=0?'paga':x.pago>0?'falta '+c2s(x.resta):'a pagar')+'</small></div></div>'}).join('')+
+   '<div class="kv" style="margin-top:6px"><span>Total das faturas</span><b>'+c2s(fT)+'</b></div>'+(fR&&fR!==fT?'<div class="kv"><span>Falta pagar</span><b class="neg">'+c2s(fR)+'</b></div>':'')+'</div>'}
+ return h}
+function vAgenda(){if(AG==='compras')return mnav()+segAg()+vCompras();if(AG==='entradas')return mnav()+segAg()+vEntradas();if(AG==='resumo')return mnav()+segAg()+vResumo();if(AG==='despesas')return mnav()+segAg()+vDespesas();
  var r=resumoMes(M),it=itensMes(M),h=mnav(),t=hoje(),ult=addD(addM(M,1)+'-01',-1),p=projecaoAte(ult<t?t:ult),sal=p.saldo;h+=segAg();
  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><div><div class="sub">Sai no mês</div><div class="big neg">'+c2s(r.pagar)+'</div>'+'</div><div style="text-align:right"><div class="sub">'+(r.falta<0?'Sai mais do que entra':'Entra mais do que sai')+'</div><div class="mid '+(r.falta<0?'neg':'pos')+'">'+c2s(Math.abs(r.falta))+'</div></div></div>';
  var tot=Math.max(1,r.pagar,r.seguro+r.incerto+r.reembPrev+r.reembRec),rb=r.reembPrev+r.reembRec;
@@ -803,11 +858,12 @@ function vCartoes(){var h=mnav(),cs=viv(S.cartoes);
  cs.forEach(function(c){var x=fatura(c.id,M);tot+=x.valor;totSua+=x.sua;totPai+=x.pai;var pg=x.valor>0?Math.min(100,x.pago/x.valor*100):0;
   h+='<div class="cc" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div style="display:flex;justify-content:space-between"><div class="nm">'+esc(c.nome)+'</div><div class="due">vence '+dcurto(x.vence)+'</div></div>'+
    '<div class="amt">'+c2s(x.valor)+(x.informado?'':'<span class="tag">estimado</span>')+(x.resta<=0&&x.valor>0?'<span class="tag">paga ✓</span>':'')+'</div>'+
-   (x.pai?'<div class="sp"><span>Sua parte '+c2s(x.sua)+'</span><span>Seu pai '+c2s(x.pai)+(x.paiPend<x.pai?' (devolveu '+c2s(x.pai-x.paiPend)+')':'')+'</span></div>':'')+
+   (x.pai?'<div class="sp"><span>Sua parte '+c2s(x.sua)+'</span><span>Seu pai '+c2s(x.pai)+'</span></div>':'')+
    '<div class="sp"><span>'+(x.its.length?x.its.length+' compra(s) lançada(s) · '+c2s(x.soma):'valor do banco')+(x.informado&&x.its.length&&x.naoId?' · sem identificar '+c2s(x.naoId):'')+'</span><span>'+(c.fecha?'fecha dia '+c.fecha:'fechamento ?')+'</span></div>'+
    '<div class="pb"><i style="width:'+pg+'%"></i></div>'+(x.pago&&x.resta>0?'<div class="sp"><span>pago '+c2s(x.pago)+'</span><span>falta '+c2s(x.resta)+'</span></div>':'')+
    (function(){var L=limiteCartao(c);if(!L)return '<div class="sp"><span>Limite não informado</span><span onclick="event.stopPropagation();abrirCartao(\''+c.id+'\')" style="text-decoration:underline">informar</span></div>';
     return '<div class="lim"><div class="sp"><span>Limite disponível</span><b>'+c2s(L.disp)+'</b></div><div class="lb2"><i style="width:'+L.pct+'%"></i></div><div class="sp"><span>em uso '+c2s(L.uso)+'</span><span>de '+c2s(L.limite)+'</span></div></div>'})()+'</div>'});
+ h+=cardContaPai(M);
  var Ls=cs.map(limiteCartao).filter(Boolean);if(Ls.length)h+='<div class="card"><h2>Limite dos cartões</h2><div class="kv"><span>Limite total</span><b>'+c2s(soma(Ls,function(L){return L.limite}))+'</b></div><div class="kv"><span>Em uso (faturas e parcelas futuras)</span><b>'+c2s(soma(Ls,function(L){return L.uso}))+'</b></div><div class="kv"><span><b style="color:var(--tx)">Disponível</b></span><b class="pos">'+c2s(soma(Ls,function(L){return L.disp}))+'</b></div><div class="sub" style="margin-top:4px">Calculado pelo que está lançado aqui. Compra nova que você lança já desconta do limite.</div></div>';
  h+='<div class="card"><div class="kv"><span>Total das faturas</span><b>'+c2s(tot)+'</b></div><div class="kv"><span>Parte do seu pai</span><b>'+c2s(totPai)+'</b></div><div class="kv"><span>Sua parte</span><b>'+c2s(totSua)+'</b></div>';
  var fut=[1,2,3].map(function(i){var ym=addM(M,i);return [ym,soma(cs,function(c){return fatura(c.id,ym).valor})]}).filter(function(f){return f[1]>0});
@@ -1176,11 +1232,34 @@ function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
  h+=maisOpcoes(fMoney('fBanco','Valor que o banco cobra',f.banco,'Deixe vazio para usar a soma dos itens lançados ('+c2s(x.soma)+').')+
   fMoney('fPai','Parte do seu pai nesta fatura',f.pai,'Compras antigas dele. As novas que você marcar "do pai" somam por cima (arredondadas).')+
   '<button class="btn" onclick="salvarFatura(\''+cid+'\',\''+ym+'\')">Salvar valores</button>',x.informado?'Corrigir o valor da fatura':'Digitar o valor que o banco cobra');
- h+='<div class="card"><div class="kv"><span>Total</span><b>'+c2s(x.valor)+'</b></div><div class="kv"><span>Sua parte</span><b>'+c2s(x.sua)+'</b></div><div class="kv"><span>Pago</span><b>'+c2s(x.pago)+'</b></div><div class="kv"><span>Falta pagar</span><b class="'+(x.resta?'neg':'')+'">'+c2s(x.resta)+'</b></div>'+(x.pai?'<div class="kv"><span>Reembolso do pai recebido</span><b>'+c2s(x.reemb)+' de '+c2s(x.pai)+'</b></div>':'')+(x.informado?'<div class="kv"><span>Não identificado</span><b class="warnc">'+c2s(x.naoId)+'</b></div>':'')+'</div>'+(x.pai>0?'<button class="btn sec" onclick="copiarPai(\''+cid+'\',\''+ym+'\')">📋 Copiar a parte do pai ('+c2s(x.pai)+')</button>':'');
+ h+='<div class="card"><div class="kv"><span>Total</span><b>'+c2s(x.valor)+'</b></div><div class="kv"><span>Sua parte</span><b>'+c2s(x.sua)+'</b></div><div class="kv"><span>Pago</span><b>'+c2s(x.pago)+'</b></div><div class="kv"><span>Falta pagar</span><b class="'+(x.resta?'neg':'')+'">'+c2s(x.resta)+'</b></div>'+(x.pai?'<div class="kv"><span>Parte do seu pai</span><b>'+c2s(x.pai)+'</b></div>':'')+(x.informado?'<div class="kv"><span>Não identificado</span><b class="warnc">'+c2s(x.naoId)+'</b></div>':'')+'</div>'+(x.pai>0?(function(){var pf=paiDaFatura(cid,ym),ks=Object.keys(pf).sort(),ref=cartaoPai();
+  return '<div class="card"><h2>A parte do seu pai vai para a conta dele</h2>'+ks.map(function(P){var cp=contaPai(P);return '<div class="row tap" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirContaPai(\''+P+'\')"><div class="g"><div class="t">'+c2s(pf[P])+' na conta de '+esc(dlab(cp.vence))+'</div><div class="s">'+(cp.resta<=0&&cp.total>0?'recebido ✓':'conta dele no total: '+c2s(cp.total))+'</div></div><span class="sub" style="font-size:18px">›</span></div>'}).join('')+
+   '<div class="sub" style="margin-top:6px">Ele devolve tudo junto, todo dia '+(ref?(+ref.vence||1):24)+(ref&&ref.id!==cid?', pelo fechamento do '+esc(ref.nome)+(ref.fecha?' (dia '+ref.fecha+')':''):'')+' — não importa em qual cartão foi a compra.</div></div>'+
+   '<button class="btn sec" onclick="copiarPai(\''+ks[0]+'\')">📋 Copiar a conta do pai ('+c2s(contaPai(ks[0]).total)+')</button>'})():'');
  x.pags.forEach(function(l){h+='<div class="row"><div class="g"><div class="t">Pago '+c2s(l.valor)+'</div><div class="s">'+dlab(l.data)+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm red" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'});
  h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.slice().sort(function(a,b){var da=a.data||'',db=b.data||'';if(da!==db)return da<db?1:-1;return ((b.l&&b.l.criado)||0)-((a.l&&a.l.criado)||0)}).forEach(function(i){h+='<div class="row tap" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');'+(i.kind==='lanc'?"abrirLanc('"+i.l.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="g"><div class="t">'+esc(i.nome)+(i.pai?' <span class="pill inf">pai</span>':'')+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+dlab(i.data)+(i.kind==='fixa'?' · conta fixa':'')+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'});
  if(!x.its.length)h+='<div class="empty">Nenhuma compra lançada neste cartão para esta fatura.</div>';
  abrir(h+'</div><button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirCartao(\''+cid+'\')">Dias de fechamento e vencimento</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
+function cardContaPai(P){var cp=contaPai(P);if(!(cp.total>0))return '';var ks=Object.keys(cp.porC);
+ return '<div class="card tap" onclick="abrirContaPai(\''+P+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div class="mid">↩️ Conta do seu pai</div><span class="sub" style="font-size:20px">›</span></div>'+
+  '<div class="kv" style="margin-top:6px"><span>Vence '+esc(dlab(cp.vence))+'</span><b>'+c2s(cp.total)+'</b></div>'+
+  '<div class="sub">'+ks.map(function(id){var c=cartao(id);return esc(c?c.nome:'?')+' '+c2s(cp.porC[id])}).join(' · ')+' · '+(cp.resta<=0?'<b class="pos">recebido ✓</b>':cp.rec>0?'recebido '+c2s(cp.rec)+', falta <b>'+c2s(cp.resta)+'</b>':'a receber')+'</div></div>'}
+function abrirContaPai(P){var cp=contaPai(P),ref=cp.ref,t=hoje();
+ var h='<h3>Conta do seu pai · '+esc(mesNome(P))+'</h3><div class="sub">Vence '+esc(dlab(cp.vence))+(ref?' · segue o '+esc(ref.nome)+(ref.fecha?' (fecha dia '+ref.fecha+')':''):'')+'</div>';
+ if(cp.resta>0&&contaPadrao())h+='<button class="btn" style="font-size:17px;padding:16px;margin-top:10px" onclick="receberPai(\''+P+'\')">✓ Recebi '+c2s(cp.resta)+' hoje</button><div class="sub" style="text-align:center;margin:-2px 0 6px">entra em '+esc(conta(contaPadrao()).nome)+'</div>'+
+  maisOpcoes(fMoney('cpVal','Quanto ele devolveu',cp.resta,'Pode ser só uma parte.')+fSel('cpConta','Caiu em',optContas(),contaPadrao())+fData('cpData','Data',t)+'<button class="btn" onclick="receberPai(\''+P+'\',1)">Registrar</button>','Outro valor, outra data ou outra conta');
+ h+='<div class="card"><div class="kv"><span>Total da conta</span><b>'+c2s(cp.total)+'</b></div>'+Object.keys(cp.porC).map(function(id){var c=cartao(id);return '<div class="kv sub"><span>no '+esc(c?c.nome:'?')+'</span><span>'+c2s(cp.porC[id])+'</span></div>'}).join('')+
+  '<div class="kv"><span>Recebido</span><b class="pos">'+c2s(cp.rec)+'</b></div><div class="kv"><span>Falta receber</span><b class="'+(cp.resta?'neg':'')+'">'+c2s(cp.resta)+'</b></div></div>';
+ h+='<button class="btn sec" onclick="copiarPai(\''+P+'\')">📋 Copiar a conta para o seu pai</button>';
+ cp.reembs.forEach(function(l){h+='<div class="row"><div class="g"><div class="t">Recebido '+c2s(l.valor)+'</div><div class="s">'+esc(dlab(l.data))+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm red" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'});
+ h+='<div class="card"><h2>Compras do seu pai nesta conta ('+(cp.its.length+cp.bases.length)+')</h2>'+cp.its.map(function(o){var i=o.i;return '<div class="row tap" onclick="filho(\'abrirContaPai\',\''+P+'\');abrirLanc(\''+i.l.id+'\')"><div class="g"><div class="t">'+esc(i.nome)+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+esc(dlab(i.data))+' · 💳 '+esc(o.c.nome)+'</div></div><div class="v">'+c2s(o.v)+'</div></div>'}).join('')+
+  cp.bases.map(function(b){return '<div class="row tap" onclick="filho(\'abrirContaPai\',\''+P+'\');abrirFatura(\''+b.c.id+'\',\''+b.ym+'\')"><div class="g"><div class="t">Valor antigo informado</div><div class="s">fatura '+esc(b.c.nome)+' de '+esc(mesNome(b.ym))+'</div></div><div class="v">'+c2s(b.v)+'</div></div>'}).join('')+
+  (cp.its.length+cp.bases.length?'':'<div class="empty">Nada nesta conta.</div>')+'<div class="sub" style="margin-top:6px">Cada compra entra arredondada em reais. Não importa em qual cartão foi: vale a data da compra no fechamento do '+esc(ref?ref.nome:'cartão')+'. Parcelado: uma parcela por mês.</div></div>';
+ abrir(h+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
+function receberPai(P,form){var cp=contaPai(P),v,c,d;if(form){v=dinheiro('cpVal',true);if(v==null)return;c=val('cpConta');d=val('cpData')||hoje()}else{v=cp.resta;c=contaPadrao();d=hoje()}
+ if(!(v>0)||!c){toast('Nada a receber');return}
+ var l={id:uid(),tipo:'reembolso',ref:'pai|'+P,valor:v,meio:c,data:d,desc:'Reembolso do pai (cartões)',criado:Date.now(),at:Date.now()};S.lanc.push(l);S.ultConta=c;save();render();
+ var re=function(){abrirContaPai(P)};if(document.getElementById('ov').classList.contains('open'))re();toastDesf('Seu pai: '+c2s(v)+' recebido',{lanc:[l.id],reabre:re})}
 function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco')),p=parseBRL(val('fPai')),f=S.faturas[k]||(S.faturas[k]={});editar(f,{banco:b,pai:p});save();abrirFatura(cid,ym);render();toast('Fatura atualizada')}
 function pagarFatura(cid,ym){var v=dinheiro('fPag',true);if(v==null)return;S.ultConta=val('fConta');S.lanc.push({id:uid(),tipo:'pagfatura',ref:cid+'|'+ym,valor:v,meio:val('fConta'),data:val('fData')||hoje(),criado:Date.now(),at:Date.now()});save();abrirFatura(cid,ym);render();toast('Pagamento registrado')}
 function desfazer(lid){var l=porId(S.lanc,lid);if(!l)return;if(!confirm('Desfazer este registro?'))return;editar(l,{del:true});save();fechar();render();toast('Desfeito')}
@@ -1436,7 +1515,9 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
  else{
   if(NL.tipo==='transf')h+=fSel('lMeio','De',optContas(),NL.meio)+fSel('lDest','Para',optContas(),NL.dest);
   else h+=fSel('lMeio',NL.tipo==='ajuste'?'Conta':'Caiu em',optContas(),NL.meio);
-  if(NL.tipo==='reembolso'){var fs=[];viv(S.cartoes).forEach(function(c){for(var i=-3;i<=2;i++){var ym=addM(ymOf(hoje()),i),x=fatura(c.id,ym);if(x.pai>0)fs.push([x.k,c.nome+' '+mesNome(ym)+' (falta '+c2s(x.paiPend)+')'])}});h+=fSel('lRef','De qual fatura',fs.length?fs:[['','Nenhuma fatura com parte do pai']],NL.ref||(fs[0]||[''])[0])}
+  if(NL.tipo==='reembolso'){var fs=[],pr='';for(var i=-3;i<=2;i++){var ym=addM(ymOf(hoje()),i),cp=contaPai(ym);if(cp.total>0){fs.push(['pai|'+ym,'Conta do pai de '+dcurto(cp.vence)+' (falta '+c2s(cp.resta)+')']);if(!pr&&cp.resta>0)pr='pai|'+ym}}
+   if(NL.ref&&!fs.some(function(o){return o[0]===NL.ref}))fs.unshift([NL.ref,'Registrado antes (fatura de cartão)']);
+   h+=fSel('lRef','De qual conta do pai',fs.length?fs:[['','Nenhuma conta do pai com valor']],NL.ref||pr||(fs[0]||[''])[0])}
   if(NL.tipo==='emprestimo')h+='<p class="help">Entra no saldo, mas é dívida: não conta como renda.</p>';
   h+='<div class="f"><input id="lDesc" value="'+esc(NL.desc||'')+'" placeholder="Descrição (opcional)"></div>';
  }
@@ -1477,7 +1558,7 @@ function descMudou(t){NL.desc=t;if(NL.catManual)return;var c=sugCat(t);if(!c||c=
 function lerNL(){var v=parseBRL(val('lVal'));if(v!=null)NL.valor=v;if(document.getElementById('lData'))NL.data=val('lData');if(document.getElementById('lDesc'))NL.desc=val('lDesc');if(document.getElementById('lMeio'))NL.meio=val('lMeio');if(document.getElementById('lDest'))NL.dest=val('lDest');if(document.getElementById('lRef'))NL.ref=val('lRef')}
 function salvarLanc(){lerNL();var v=parseBRL(val('lVal'));if(NL.tipo==='ajuste'){if(v==null){toast('Informe o valor');return}}else if(v==null||v<=0){toast('Informe o valor');return}
  if(!NL.meio){toast('Escolha a conta');return}if(NL.tipo==='transf'&&(!NL.dest||NL.dest===NL.meio)){toast('Escolha contas diferentes');return}
- if(NL.tipo==='reembolso'&&!NL.ref){toast('Não há fatura com parte do pai');return}
+ if(NL.tipo==='reembolso'&&!NL.ref){toast('Não há conta do pai com valor');return}
  if(NL.tipo==='entrada'&&['multa','acerto'].indexOf(NL.orig)>=0&&!NL.carro){toast('Escolha o carro');return}
  if(NL.tipo==='gasto'&&!NL.cat)NL.cat=sugCat(NL.desc)||'Outros';
  var gc=NL.tipo==='gasto'&&ehCartao(NL.meio),car=NL.carro?carro(NL.carro):null,desc=(NL.desc||'').trim();
