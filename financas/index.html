@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=48, APP_DATE='11/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=49, APP_DATE='11/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -913,6 +913,13 @@ function semanasHtml(kind,id,ws){return '<div class="weeks">'+ws.map(function(x)
   var cur=function(v){return c2s(v).replace('R$ ','')};
   var tx=x.status==='pago'?(mr>0?'multa '+cur(mr):cur(x.pagoParc||x.valor)):x.status==='parado'?(x.apagada?'apagada':x.semContrato?'sem contrato':'parado'):x.status==='adiantado'?'adiantado':x.status==='adiado'?'adiado →':(x.parcial?'falta '+cur(x.resta+mr):x.status==='atrasado'?cur(x.resta+mr):cur(x.valor));
   return '<div class="wk '+cl+'" onclick="event.stopPropagation();abrirSemana(\''+kind+'\',\''+id+'\',\''+x.sem+'\')"><b>'+dcurto(x.sem)+'</b>'+tx+'</div>'}).join('')+'</div>'}
+/* Hudson 11/11: manutenção paga por Pix/cartão e lançada no carro TAMBÉM vai para o Gestão — contar as duas seria despesa dobrada.
+   Regra: no resultado do carro, manutenção é a do Gestão (já com a parte do motorista). O gasto de categoria "Carros"
+   lançado aqui continua no seu dinheiro (saldo, fatura, categorias), mas não entra de novo no resultado do carro.
+   Se esse gasto NÃO vai para o Gestão, marque "Não vai pro Gestão" no lançamento e ele conta aqui. */
+function manutViaGestao(car,cat,fora){return !!(car&&car.gpk&&extChave()&&EXT.manut&&cat==='Carros'&&!fora)}
+function _catLancCarro(l){if(l.tipo==='gasto')return l.cat||'';if(l.tipo==='pagavulsa'){var a=porId(S.avulsas,l.ref);return a?(a.cat||sugCat(a.desc)||''):''}return ''}
+function _foraLanc(l){if(l.foraGestao)return true;if(l.tipo==='pagavulsa'){var a=porId(S.avulsas,l.ref);return !!(a&&a.foraGestao)}return false}
 function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return x.kind==='carro'&&x.id===car.id});
  var _adR=function(x){return (x.multaInfo&&x.multaInfo.rec)||0}; /* semana que passou para outra: conta só o que entrou nela (o resto já está na semana seguinte — antes contava 2 vezes) */
  var contrato=soma(ws.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'}),function(x){return x.status==='adiado'?_adR(x):x.status==='pago'?x.contrato:x.valor}),rec=soma(ws.filter(function(x){return x.status==='pago'||x.status==='adiado'}),function(x){return x.status==='adiado'?_adR(x):x.valor});
@@ -920,8 +927,9 @@ function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return 
  var custos=viv(S.fixas).filter(function(f){return f.carro===car.id&&fixaVigente(f,ym)}),cst=soma(custos,function(f){return valorFixa(f,ym)});
  var man=extManut(car,ym).mes,manSua=soma(man,function(m){return m.sua}),manConsid=Math.max(0,manSua-abat);
  var docs=docsPagosMes(car,ym),docT=soma(docs,function(o){return o.valor});
- var ext=viv(S.lanc).filter(function(l){return l.carro===car.id&&ymOf(l.data)===ym&&(l.tipo==='entrada'||l.tipo==='gasto'||l.tipo==='recavulsa'||l.tipo==='pagavulsa')}),_in=function(l){return l.tipo==='entrada'||l.tipo==='recavulsa'},eIn=soma(ext.filter(_in),function(l){return l.valor}),eOut=soma(ext.filter(function(l){return !_in(l)}),function(l){return l.valor});
- return {ws:ws,contrato:contrato,rec:rec,abat:abat,custos:custos,cst:cst,man:man,manSua:manSua,manConsid:manConsid,docs:docs,docT:docT,ext:ext,eIn:eIn,eOut:eOut,res:rec+eIn-cst-manConsid-docT-eOut}}
+ var ext0=viv(S.lanc).filter(function(l){return l.carro===car.id&&ymOf(l.data)===ym&&(l.tipo==='entrada'||l.tipo==='gasto'||l.tipo==='recavulsa'||l.tipo==='pagavulsa')}),
+  extMan=ext0.filter(function(l){return (l.tipo==='gasto'||l.tipo==='pagavulsa')&&manutViaGestao(car,_catLancCarro(l),_foraLanc(l))}),ext=ext0.filter(function(l){return extMan.indexOf(l)<0}),extManT=soma(extMan,function(l){return l.valor}),_in=function(l){return l.tipo==='entrada'||l.tipo==='recavulsa'},eIn=soma(ext.filter(_in),function(l){return l.valor}),eOut=soma(ext.filter(function(l){return !_in(l)}),function(l){return l.valor});
+ return {ws:ws,contrato:contrato,rec:rec,abat:abat,custos:custos,cst:cst,man:man,manSua:manSua,manConsid:manConsid,docs:docs,docT:docT,ext:ext,extMan:extMan,extManT:extManT,eIn:eIn,eOut:eOut,res:rec+eIn-cst-manConsid-docT-eOut}}
 
 /* ===== Hudson 05/11: resultado do carro como no app Resultados do pai — Ganhos, Despesas e Lucro,
    "até hoje" (o que já aconteceu) e "no mês" (fechamento previsto). Pelo mês de COMPETÊNCIA:
@@ -931,7 +939,7 @@ function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return 
    - manutenção (sua parte), gastos e recebimentos lançados com o carro e contas agendadas do carro;
    - IPVA/GRT/multas do app Multas só entram quando você paga e lança (como combinado);
    - o que é incerto aparece, mas fica FORA da conta. */
-function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),passado=ym<cur,futuro=ym>cur,ini=ym+'-01',ins=[],outs=[],inc=[];
+function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),passado=ym<cur,futuro=ym>cur,ini=ym+'-01',ins=[],outs=[],inc=[],manAv=0;
  var ws=k.ws.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&x.multaInfo}),pS=0,rS=0,atr={};
  var atrInc={};ws.forEach(function(x){var q=x.multaInfo,inc0=certCarro(car,q.inf,x.sem)==='incerta';
   if(inc0){var fz=Math.max(0,q.devido-(q.abat||0)-(q.rec||0));pS+=q.rec||0;if(fz>0)inc.push({n:'Semana de '+dcurto(x.sem)+(q.inf&&q.inf.encerrado?' (contrato encerrado)':''),r:0,p:fz})}
@@ -940,12 +948,13 @@ function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),pa
  if(ws.length||rS)ins.push({n:'Semanais ('+ws.length+' semana'+(ws.length!==1?'s':'')+')',r:rS,p:Math.max(pS,rS)});
  k.ext.forEach(function(l){var ent=l.tipo==='entrada'||l.tipo==='recavulsa';(ent?ins:outs).push({n:(l.desc||l.cat||'Lançamento')+' · '+dcurto(l.data),r:l.valor,p:l.valor})});
  viv(S.avulsas).forEach(function(a){if(a.carro!==car.id||ymOf(a.data)!==ym)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')}),function(l){return l.valor}),r=a.valor-pg;if(r<=0)return;
+  if(!a.receber&&manutViaGestao(car,a.cat||sugCat(a.desc)||'',a.foraGestao)){manAv+=r;return}
   var o={n:a.desc+' · '+(a.receber?'a receber ':'a pagar ')+dcurto(a.data),r:0,p:r,av:a.id};if(a.receber&&a.incerto)inc.push(o);else(a.receber?ins:outs).push(o)});
  k.custos.forEach(function(f){var v=valorFixa(f,ym),due=fixaMes(f,ym).due;outs.push({n:f.nome+(f.dia?' · dia '+f.dia:''),r:(passado||(!futuro&&due<=t))?v:0,p:v})});
  if(k.manConsid)outs.push({n:'Manutenção (sua parte'+(k.abat?', menos o abatido no semanal':'')+')',r:k.manConsid,p:k.manConsid});
  k.docs.forEach(function(o){outs.push({n:o.nome+' (pago '+dcurto(o.pago)+')',r:o.valor,p:o.valor})});
  var tot=function(l,c){return soma(l,function(o){return o[c]})},iR=tot(ins,'r'),iP=tot(ins,'p'),oR=tot(outs,'r'),oP=tot(outs,'p'),ks=Object.keys(atr).sort(),atrT=soma(ks,function(w){return atr[w]});
- return {k:k,ins:ins,outs:outs,inc:inc,iR:iR,iP:iP,oR:oR,oP:oP,lR:iR-oR,lP:iP-oP,atr:atrT,atrW:ks,atrInc:ks.length>0&&ks.every(function(w){return atrInc[w]}),passado:passado,futuro:futuro}}
+ return {k:k,ins:ins,outs:outs,inc:inc,iR:iR,iP:iP,oR:oR,oP:oP,lR:iR-oR,lP:iP-oP,atr:atrT,atrW:ks,atrInc:ks.length>0&&ks.every(function(w){return atrInc[w]}),passado:passado,futuro:futuro,manPix:k.extManT,manAv:manAv,manSemGestao:(k.extManT+manAv)>0&&!k.man.length&&!extManut(car,addM(ym,-1)).mes.length}}
 function resCols(r){return r.futuro?['','No mês (previsto)']:r.passado?['Realizado','Previsto']:['Até hoje','No mês']}
 function resTabela(r,det){var c=resCols(r),one=r.futuro,cell=function(v,cls){return '<b class="'+(cls||'')+'">'+c2s(v)+'</b>'};
  var row=function(n,a,b,cls){return '<div class="rc'+(cls?' '+cls:'')+'"><span>'+n+'</span>'+(one?'':'<em>'+a+'</em>')+'<em>'+b+'</em></div>'};
@@ -957,6 +966,7 @@ function resTabela(r,det){var c=resCols(r),one=r.futuro,cell=function(v,cls){ret
  h+=row('Lucro','<b class="'+(r.lR<0?'neg':'pos')+'">'+c2s(r.lR)+'</b>','<b class="'+(r.lP<0?'neg':'pos')+'">'+c2s(r.lP)+'</b>','rcl')+'</div>';
  var notas=[];
  if(r.atr>0){var m1=mesNome(ymOf(r.atrW[0])).split(' ')[0],m2=mesNome(ymOf(r.atrW[r.atrW.length-1])).split(' ')[0];notas.push(r.atrInc?'❔ Atrasados de '+(m1===m2?m1:m1+' a '+m2)+' do contrato encerrado: <b>'+c2s(r.atr)+'</b> — incerto (são do mês deles, não entram neste lucro)':'⏳ Atrasados de '+(m1===m2?m1:m1+' a '+m2)+' ainda a receber: <b>'+c2s(r.atr)+'</b> (são do mês deles, não entram neste lucro)')}
+ if(r.manPix||r.manAv)notas.push(r.manSemGestao?'⚠️ '+c2s(r.manPix+r.manAv)+' de manutenção '+(r.manPix?'paga aqui':'agendada')+' ainda <b>não está no Gestão</b>: lance a manutenção lá para entrar no resultado (ou, no gasto, marque "Não vai pro Gestão").':'🔧 '+c2s(r.manPix+r.manAv)+' de manutenção '+(r.manPix?'paga por Pix/cartão':'agendada')+' já entra pela manutenção do Gestão — não conta duas vezes.');
  if(r.inc.length)notas.push('❔ Incerto, fora da conta: '+r.inc.map(function(o){return esc(o.n)+' '+c2s(o.p)}).join(' · '));
  if(notas.length)h+='<div class="sub" style="margin-top:6px;line-height:1.45">'+notas.join('<br>')+'</div>';
  return h}
@@ -1517,7 +1527,7 @@ function abrirLanc(id){var l=porId(S.lanc,id);if(!l)return;
  if(l.tipo==='pagfatura'){var p=l.ref.split('|');abrirFatura(p[0],p[1]);return}
  if(l.tipo==='pagfixa'){var q=l.ref.split('|');abrirFixaMes(q[0],q[1]);return}
  if(l.tipo==='pagavulsa'||l.tipo==='recavulsa'){if(porId(S.avulsas,l.ref))abrirUni('avulsa',l.ref);else abrirAvulsa(l.ref);return}
- NL={tipo:l.tipo,cat:l.cat||'Outros',catManual:1,meio:l.meio,dest:l.dest,de:l.de||'eu',parc:l.parc||1,id:l.id,valor:l.valor,neg:l.valor<0,data:l.data,desc:l.desc,ref:l.ref,carro:l.carro||'',orig:l.orig||'outra'};formLanc()}
+ NL={tipo:l.tipo,cat:l.cat||'Outros',catManual:1,meio:l.meio,dest:l.dest,de:l.de||'eu',parc:l.parc||1,id:l.id,valor:l.valor,neg:l.valor<0,data:l.data,desc:l.desc,ref:l.ref,carro:l.carro||'',orig:l.orig||'outra',foraGestao:!!l.foraGestao};formLanc()}
 /* ===== lançar (Hudson 03/11): inteligente e curto =====
    Gasto: escreve o que foi e o app sugere a categoria; escolhe Pix/conta ou o cartão e o app já mostra em qual fatura cai
    (pelo dia de fechamento), as parcelas e quanto sobra de limite. Entrada: diz de onde veio (semanal, multa do motorista,
@@ -1554,6 +1564,7 @@ function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?
   if(ehCartao(NL.meio)){h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(n){return '<button class="'+((+NL.parc||1)===n?'on':'')+'" onclick="nlSet(\'parc\','+n+')">'+(n===1?'À vista':n+'x')+'</button>'}).join('')+'<button class="'+(NL.de==='pai'?'on':'')+'" onclick="nlSet(\'de\',NL.de===\'pai\'?\'eu\':\'pai\')">É do pai</button></div></div>'+infoCartao()}
   h+=nlAgendado()?'':fixaChipHtml();
   h+='<div class="f" id="lCarroBox" style="'+(NL.cat==='Carros'||NL.cat==='Multas e débitos'||NL.carro?'':'display:none')+'"><label>Qual carro</label>'+chipsHtml([['','Nenhum']].concat(carrosAtivos().filter(function(c){return true}).concat(NL.carro&&carro(NL.carro)&&excluidoEm(carro(NL.carro))?[carro(NL.carro)]:[]).map(function(c){return [c.id,c.nome.split(' ')[0]]})),NL.carro||'','nlCarro')+'</div>';
+  if(NL.carro&&NL.cat==='Carros'&&carro(NL.carro)&&carro(NL.carro).gpk&&extChave())h+='<div class="f"><label>Essa manutenção está (ou vai) no Gestão?</label><div class="chips"><button class="'+(NL.foraGestao?'':'on')+'" onclick="nlSet(\'foraGestao\',0)">Sim — não conta de novo no carro</button><button class="'+(NL.foraGestao?'on':'')+'" onclick="nlSet(\'foraGestao\',1)">Não vai pro Gestão</button></div><small>'+(NL.foraGestao?'Conta como despesa do carro aqui.':'No resultado do carro vale a manutenção do Gestão (com a parte do motorista). Aqui fica só o dinheiro que saiu.')+'</small></div>';
  }
  else if(NL.tipo==='entrada'){
   h+='<div class="f"><label>De onde veio</label>'+chipsHtml(ORIG,NL.orig||'outra','nlOrig')+'</div>';
@@ -1614,10 +1625,10 @@ function salvarLanc(){lerNL();var v=parseBRL(val('lVal'));if(NL.tipo==='ajuste')
  var gc=NL.tipo==='gasto'&&ehCartao(NL.meio),car=NL.carro?carro(NL.carro):null,desc=(NL.desc||'').trim();
  if(NL.tipo==='entrada'&&!desc){var on=(ORIG.filter(function(o){return o[0]===NL.orig})[0]||[])[1];if(on&&NL.orig!=='outra')desc=on+(car?' · '+car.nome:'')}
  if(nlAgendado()){var rec=NL.tipo==='entrada',dd=NL.data||hoje();
-  var av={id:uid(),criado:Date.now(),desc:desc||(rec?'Recebimento':(NL.cat||'Conta')),valor:v,data:dd,incerto:rec&&!!NL.incerto,cat:rec?(NL.orig==='multa'?'Multas e débitos':'Outros'):(NL.cat||'Outros'),carro:car?car.id:null,receber:rec,orig:rec?(NL.orig||'outra'):null,agendado:true};
+  var av={id:uid(),criado:Date.now(),desc:desc||(rec?'Recebimento':(NL.cat||'Conta')),valor:v,data:dd,incerto:rec&&!!NL.incerto,cat:rec?(NL.orig==='multa'?'Multas e débitos':'Outros'):(NL.cat||'Outros'),carro:car?car.id:null,receber:rec,orig:rec?(NL.orig||'outra'):null,agendado:true,foraGestao:!rec&&car&&NL.cat==='Carros'&&NL.foraGestao?true:false};
   S.avulsas.push(av);save();fechar();render();toast('📅 Agendado para '+dlab(dd)+' — não mexe no saldo');return}
  var p={tipo:NL.tipo,valor:NL.tipo==='ajuste'?(NL.neg?-Math.abs(v):v):v,data:NL.data||hoje(),desc:desc,meio:NL.meio,cat:NL.tipo==='gasto'?NL.cat:null,de:gc?NL.de:'eu',parc:gc?(+NL.parc||1):1,dest:NL.tipo==='transf'?NL.dest:null,ref:NL.tipo==='reembolso'?NL.ref:null,
-  carro:(NL.tipo==='gasto'||NL.tipo==='entrada')&&car?car.id:null,orig:NL.tipo==='entrada'?(NL.orig||'outra'):null};
+  carro:(NL.tipo==='gasto'||NL.tipo==='entrada')&&car?car.id:null,orig:NL.tipo==='entrada'?(NL.orig||'outra'):null,foraGestao:NL.tipo==='gasto'&&car&&NL.cat==='Carros'&&NL.foraGestao?true:false};
  var _lid=NL.id;if(NL.id)editar(porId(S.lanc,NL.id),p);else{_lid=uid();S.lanc.push(Object.assign({id:_lid,criado:Date.now(),at:Date.now()},p))}
  var _fx=null;if(NL.tipo==='gasto'&&NL.fixa&&!fixaDoLanc()&&p.parc===1){
   _fx={id:uid(),criado:Date.now(),nome:desc||p.cat||'Conta fixa',valor:v,dia:+p.data.slice(8,10),cat:p.cat,meio:ehCartao(p.meio)?p.meio:'conta',carro:p.carro||null,inicio:addM(ymOf(p.data),1),fim:null,doLanc:_lid};
