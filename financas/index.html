@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=50, APP_DATE='12/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=51, APP_DATE='12/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -409,19 +409,27 @@ function paiNasFaturas(xs){return soma(xs.filter(function(x){return x.kind==='fa
 /* ---------- projeção: saldo dia a dia, e depois de cada conta ---------- */
 function chaveItem(x){return [x.kind,x.id,x.ym||'',x.sem||'',x.dataOrig||x.data].join('|')}
 function projecaoAte(ate){
- var t=hoje(),ev=[];if(ate<t)ate=t;
+ var t=hoje(),ev=[],netP={};if(ate<t)ate=t;
  var ms=[];for(var m=S.inicio<addM(ymOf(t),-2)?addM(ymOf(t),-2):S.inicio;m<=ymOf(ate);m=addM(m,1))ms.push(m);
  ms.forEach(function(ym){itensMes(ym).forEach(function(x){
   if(x.kind==='lanc'||x.status==='pago'||x.status==='parado'||x.resta<=0)return;
   if(x.data>ate)return;
+  /* Hudson 12/11: a fatura entra só com a SUA parte; a do pai ele paga (o reembolso dele não entra de novo) */
+  if(x.kind==='reemb')return;
+  if(x.kind==='fatura'&&x.pai>0&&x.valor>0){var rf=cartaoPai(),pf=paiDaFatura(x.id,x.ym),pa=0,fr=x.resta/x.valor;Object.keys(pf).forEach(function(P){if(diaNoMes(P,rf?(+rf.vence||1):24)<=x.data){pa+=pf[P];netP[P]=(netP[P]||0)+pf[P]*fr}});
+   /* só desconta a parte do pai que ele devolve até o vencimento desta fatura (a que ele devolve depois, você ainda precisa ter no dia) */
+   if(pa>0){var sr=Math.max(0,Math.round(x.resta-pa*x.resta/x.valor));x=Object.assign({},x,{resta:sr,restaBanco:x.resta})}}
   if(x.data<t){if(x.sinal<0&&ym>=S.inicio)ev.push(Object.assign({},x,{data:t,atrasado:true,dataOrig:x.data}));return}
   ev.push(x)})});
+ /* o que o pai ainda deve de faturas que você JÁ pagou inteiras (não está descontado em nenhuma fatura acima) entra no dia da conta dele */
+ ms.forEach(function(ym){var cp=contaPai(ym);if(!(cp.resta>0)||cp.vence>ate)return;var ex=Math.round(cp.resta-(netP[ym]||0));
+  if(ex>0)ev.push({kind:'reemb',id:'pai',ym:ym,data:cp.vence<t?t:cp.vence,sinal:1,valor:ex,resta:ex,cert:'provavel',titulo:'Seu pai devolve',status:'pendente'})});
  ev.sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:(b.sinal-a.sinal)});
- var saldo=saldoTotal(),run=saldo==null?0:saldo,cumIn=0,cumInc=0,cumPai=0,paiNasContas=0,min=null,minDia=null,dias_={},prox=null,dep={},outs=[];
+ var saldo=saldoTotal(),run=saldo==null?0:saldo,cumIn=0,cumInc=0,min=null,minDia=null,dias_={},prox=null,dep={},outs=[];
  var porDia={};ev.forEach(function(x){(porDia[x.data]=porDia[x.data]||[]).push(x)});
  for(var d=t;d<=ate;d=addD(d,1)){var de=porDia[d]||[];
-  de.forEach(function(x){if(x.sinal>0){if(x.cert==='provavel'){run+=x.resta;cumIn+=x.resta;if(x.kind==='reemb')cumPai+=x.resta}else cumInc+=x.resta;dep[chaveItem(x)]={saldo:run}}});
-  de.forEach(function(x){if(x.sinal<0){var antes=run;run-=x.resta;var o={x:x,data:d,antes:antes,saldo:run,cumIn:cumIn,cumInc:cumInc,cumPai:cumPai,paiAntes:paiNasContas};dep[chaveItem(x)]=o;outs.push(o);if(x.kind==='fatura'&&x.pai>0&&x.valor>0)paiNasContas+=Math.round(x.pai*x.resta/x.valor)}});
+  de.forEach(function(x){if(x.sinal>0){if(x.cert==='provavel'){run+=x.resta;cumIn+=x.resta}else cumInc+=x.resta;dep[chaveItem(x)]={saldo:run}}});
+  de.forEach(function(x){if(x.sinal<0){var antes=run;run-=x.resta;var o={x:x,data:d,antes:antes,saldo:run,cumIn:cumIn,cumInc:cumInc};dep[chaveItem(x)]=o;outs.push(o)}});
   dias_[d]={itens:de,saldo:run};if(min==null||run<min){min=run;minDia=d}
   if(!prox&&d>t&&de.some(function(x){return x.sinal>0&&x.cert==='provavel'}))prox=d}
  return {t:t,ate:ate,ev:ev,saldo:saldo,min:min,minDia:minDia,dias:dias_,prox:prox,dep:dep,outs:outs,
@@ -479,13 +487,13 @@ function acaoItem(x){switch(x.kind){
  case 'doc':return "abrirDetCarro('"+x.id+"')";
  default:return "abrirLanc('"+x.id+"')"}}
 function linhaItem(x,proj,dep){
- var v=proj?x.resta:x.valor,cls=x.sinal<0?'':'pos',sg=x.sinal<0?'−':x.sinal>0?'+':'';
+ var v=proj?x.resta:x.valor,cls=x.sinal<0?'':'pos',sg=x.sinal<0?'−':x.sinal>0?'+':'';if(x.kind==='fatura'&&x.pai>0)v=proj?suaR(x):suaV(x);
  if(x.status==='parado'){v=x.contrato;cls='';sg=''}
  var sub=[];if(x.atrasado)sub.push('venceu '+dlab(x.dataOrig));if(x.semData)sub.push('data a confirmar');
  if(x.kind==='carro'&&x.status==='pago'&&x.contrato&&x.valor!==x.contrato)sub.push('contrato '+c2s(x.contrato));
  if((x.kind==='carro'||x.kind==='multa')&&x.nota&&x.status!=='pago')sub.push(x.nota);
- if(proj&&x.resta!==x.valor&&x.status!=='parado'&&!x._semDe)sub.push('de '+c2s(x.valor));
- if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte '+c2s(suaV(x))+' · seu pai '+c2s(x.pai));
+ if(proj&&x.resta!==x.valor&&x.status!=='parado'&&!x._semDe&&!(x.kind==='fatura'&&x.pai>0))sub.push('de '+c2s(x.valor));
+ if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte · fatura '+c2s(x.valor));
  var muted=(x.status==='pago'||x.status==='parado'||x.status==='cartao')&&!proj?' muted':'';
  var pl=pillStatus(x,proj),aft='';
  if(dep&&x.sinal<0&&saldoTotal()!=null)aft='<small class="'+(dep.saldo<0?'neg':'')+'">'+(dep.saldo<0?'faltam '+c2s(-dep.saldo):'sobra '+c2s(dep.saldo))+'</small>';
@@ -518,12 +526,9 @@ function heroSaldo(p,curto){
  return h.replace('<div class="hero">','<div class="hero tap" onclick="abrirSaldo()">')+'</div>'}
 function salvarSaldoRapido(cid){var v=parseBRL(val('hSaldo'));if(v==null){toast('Digite o saldo');return}var c=conta(cid);editar(c,{saldoIni:v,dataIni:hoje(),saldoAt:Date.now()});save();render();toast('Saldo salvo')}
 function cardDecisao(o,p){var x=o.x,outras=(p.saldo==null?0:p.saldo)+o.cumIn-o.antes;
- var h='<div class="dec" onclick="'+acaoItem(x)+'"><div class="top"><div><div class="nm">'+icone(x)+' '+esc(x.titulo)+'</div><div class="when">'+(x.atrasado?'venceu '+dlab(x.dataOrig)+' · atrasado':dlab(o.data)+' · '+quando(o.data))+'</div></div><div class="amt">'+c2s(x.resta)+'</div></div>';
+ var h='<div class="dec" onclick="'+acaoItem(x)+'"><div class="top"><div><div class="nm">'+icone(x)+' '+esc(x.titulo)+'</div><div class="when">'+(x.atrasado?'venceu '+dlab(x.dataOrig)+' · atrasado':dlab(o.data)+' · '+quando(o.data))+(x.restaBanco?' · sua parte (fatura '+c2s(x.valor)+')':'')+'</div></div><div class="amt">'+c2s(x.resta)+'</div></div>';
  if(p.saldo==null)return h+'<div class="eq"><div><span>Informe o saldo de hoje para ver se dá</span></div></div></div>';
- /* Hudson 12/11: a parte do pai aparece separada — ele devolve no dia dele; a fatura paga inteira inclui a parte dele */
- var cp=o.cumPai||0,ent=(o.cumIn||0)-cp,pa=o.paiAntes||0;
- h+='<div class="eq"><div><span>Dinheiro hoje</span><b>'+c2s(p.saldo)+'</b></div>'+(ent?'<div><span>+ entra até lá (provável)</span><b class="pos">'+c2s(ent)+'</b></div>':'')+(cp?'<div><span>+ seu pai devolve (parte dele nos cartões)</span><b class="pos">'+c2s(cp)+'</b></div>':'')+(outras>0?'<div><span>− contas antes desta'+(pa?'<small style="display:block;font-size:12px;opacity:.75">inclui '+c2s(pa)+' do seu pai nas faturas</small>':'')+'</span><b class="neg">'+c2s(outras)+'</b></div>':'')+'<div class="tot"><span>Disponível no dia</span><b>'+c2s(o.antes)+'</b></div></div>';
- if(x.kind==='fatura'&&x.pai>0)h+='<div class="sub" style="margin:6px 2px 0">Nesta fatura: sua parte '+c2s(suaV(x))+' · do seu pai '+c2s(x.pai)+' (ele devolve na conta dele, dia '+(cartaoPai()?(+cartaoPai().vence||24):24)+').</div>';
+ h+='<div class="eq"><div><span>Dinheiro hoje</span><b>'+c2s(p.saldo)+'</b></div>'+(o.cumIn?'<div><span>+ entra até lá (provável)</span><b class="pos">'+c2s(o.cumIn)+'</b></div>':'')+(outras>0?'<div><span>− contas antes desta</span><b class="neg">'+c2s(outras)+'</b></div>':'')+'<div class="tot"><span>Disponível no dia</span><b>'+c2s(o.antes)+'</b></div></div>';
  var r=o.saldo;h+='<div class="res '+(r>=0?'ok':'bad')+'"><span>'+(r>=0?'Dá para pagar':'Precisa de mais')+'<small>'+(r>=0?'depois de pagar, sobra':'para cobrir, faltam')+'</small></span><span style="font-size:19px">'+c2s(Math.abs(r))+'</span></div>';
  if(r<0&&o.cumInc>0)h+='<div class="sub" style="margin-top:7px">Se as entradas incertas até lá caírem ('+c2s(o.cumInc)+'), '+(r+o.cumInc>=0?'dá e sobra '+c2s(r+o.cumInc):'ainda faltam '+c2s(-(r+o.cumInc)))+'.</div>';
  return h+'</div>'}
@@ -708,7 +713,7 @@ function vHoje(){
  var t=hoje(),fim=addD(addM(ymOf(t),1)+'-01',-1),p=projecaoAte(addD(t,14)>fim?addD(t,14):fim),h=heroMes(p,fim);
  var velhas=velhasHoje();
  if(velhas.length)h+='<div class="card"><h2>Ficou de '+mesNome(ymOf(velhas[0].x.dataOrig)).split(' ')[0]+' sem marcar</h2><div class="sub" style="margin:-4px 0 6px">Já pagou? Toque em ✓ (não mexe no saldo).</div>'+
-  velhas.map(function(o){var x=o.x;return '<div class="row tap" onclick="'+acaoItem(x)+'"><div class="bub out">'+icone(x)+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">venceu '+dlab(x.dataOrig)+'</div></div><div class="v">'+c2s(x.resta)+'</div><button class="okb" aria-label="Já paguei" onclick="event.stopPropagation();pagarRapido(\''+(x.kind==='avulsa'?'avulsa':x.kind)+'\',\''+x.id+'\',\''+(x.ym||'')+'\',1)">✓</button></div>'}).join('')+(velhas.length>2?'<button class="btn sec" style="margin-top:10px" onclick="pagarVelhas()">✓ Já paguei todas ('+velhas.length+')</button>':'')+'</div>';
+  velhas.map(function(o){var x=o.x;return '<div class="row tap" onclick="'+acaoItem(x)+'"><div class="bub out">'+icone(x)+'</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">venceu '+dlab(x.dataOrig)+'</div></div><div class="v">'+c2s(x.restaBanco||x.resta)+'</div><button class="okb" aria-label="Já paguei" onclick="event.stopPropagation();pagarRapido(\''+(x.kind==='avulsa'?'avulsa':x.kind)+'\',\''+x.id+'\',\''+(x.ym||'')+'\',1)">✓</button></div>'}).join('')+(velhas.length>2?'<button class="btn sec" style="margin-top:10px" onclick="pagarVelhas()">✓ Já paguei todas ('+velhas.length+')</button>':'')+'</div>';
  h+=proximoAperto();
  h+=blocoReceber();
  h+=blocoPagar7(p,velhas);
@@ -734,10 +739,10 @@ function proximoAperto(){var p=projecao(90);if(p.saldo==null)return '';var os=p.
  if(!os.length)return '';var m=os.reduce(function(a,b){return b.saldo<a.saldo?b:a});
  return '<div class="card tap" onclick="'+acaoItem(m.x)+'" style="padding:13px 16px"><div style="display:flex;gap:10px;align-items:center"><div class="bub in">✓</div><div class="g"><div class="t" style="font-weight:700">Não falta dinheiro em nenhum dia até '+dcurto(p.ate)+'</div><div class="sub">Dia mais apertado: '+esc(m.x.titulo)+' em '+dcurto(m.data)+' · depois de pagar, sobra '+c2s(m.saldo)+'. Compras novas no cartão mudam a conta.</div></div></div></div>'}
 /* contas que vencem nesta semana, com ✓ de um toque */
-function blocoPagar7(p,velhas){var t=hoje(),lim=addD(t,14),os=p.outs.filter(function(o){return o.x.resta>0&&o.data<=lim&&velhas.indexOf(o)<0&&!(o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t))});
+function blocoPagar7(p,velhas){var t=hoje(),lim=addD(t,14),os=p.outs.filter(function(o){return (o.x.resta>0||o.x.restaBanco>0)&&o.data<=lim&&velhas.indexOf(o)<0&&!(o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t))});
  if(!os.length)return '';
  return '<div class="card"><h2>Para pagar · próximos 14 dias</h2>'+os.map(function(o){var x=o.x,k=x.kind==='avulsa'?'avulsa':x.kind,pode=k==='fixa'||k==='fatura'||k==='avulsa';
-  return '<div class="row tap" onclick="'+acaoItem(x)+'">'+ckHtml(x,pode?"pagarRapido('"+k+"','"+x.id+"','"+(x.ym||'')+"')":'')+'<div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+(x.atrasado?'<span class="neg">venceu '+dcurto(x.dataOrig)+'</span>':dcurto(o.data))+(p.saldo!=null&&o.saldo<0?' · <span class="neg">falta dinheiro</span>':'')+'</div></div><div class="v">'+c2s(x.resta)+'</div></div>'}).join('')+
+  return '<div class="row tap" onclick="'+acaoItem(x)+'">'+ckHtml(x,pode?"pagarRapido('"+k+"','"+x.id+"','"+(x.ym||'')+"')":'')+'<div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">'+(x.atrasado?'<span class="neg">venceu '+dcurto(x.dataOrig)+'</span>':dcurto(o.data))+(x.restaBanco?(x.resta>0?' · sua parte (fatura '+c2s(x.valor)+')':' · toda do seu pai — pague o banco e ele devolve'):'')+(p.saldo!=null&&o.saldo<0?' · <span class="neg">falta dinheiro</span>':'')+'</div></div><div class="v">'+c2s(x.resta>0||!x.restaBanco?x.resta:x.restaBanco)+'</div></div>'}).join('')+
   '<div class="sub" style="margin-top:6px">Círculo = paguei tudo hoje. Toque no nome para outro valor, data ou conta.</div></div>'}
 /* Hoje: visão do mês — entradas, despesas e cartões (Hudson 03/11, inspirado no Minhas Finanças) */
 function visaoMes(){var ym=ymOf(hoje()),it=itensMes(ym);
@@ -1320,7 +1325,7 @@ function pagarFatura(cid,ym){var v=dinheiro('fPag',true);if(v==null)return;S.ult
 function desfazer(lid){var l=porId(S.lanc,lid);if(!l)return;if(!confirm('Desfazer este registro?'))return;editar(l,{del:true});save();fechar();render();toast('Desfeito')}
 
 /* ===== pagar com um toque (fixa, fatura, avulsa) ===== */
-function velhasHoje(){var t=hoje();return projecao(PROJ_DIAS).outs.filter(function(o){return o.x.resta>0&&o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t)})}
+function velhasHoje(){var t=hoje();return projecao(PROJ_DIAS).outs.filter(function(o){return (o.x.resta>0||o.x.restaBanco>0)&&o.x.atrasado&&ymOf(o.x.dataOrig)<ymOf(t)})}
 function pagarVelhas(){var vs=velhasHoje(),ids=[];if(!vs.length)return;if(!confirm('Marcar as '+vs.length+' contas como já pagas? O saldo não muda.'))return;vs.forEach(function(o){var id=pagarRapido(o.x.kind,o.x.id,o.x.ym||'',1,1);if(id)ids.push(id)});save();render();toastDesf(ids.length+' contas marcadas como pagas',{lanc:ids})}
 function nomeContaL(l){return l.fora?'já estava pago (fora do saldo)':((conta(l.meio)||{}).nome||'')}
 function _mesAnt(d){return !!d&&ymOf(d)<ymOf(hoje())}
