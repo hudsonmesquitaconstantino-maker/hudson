@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=51, APP_DATE='12/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=52, APP_DATE='12/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -893,7 +893,7 @@ function vAgenda(){if(AG==='compras')return mnav()+segAg()+vCompras();if(AG==='e
  else if(M>=ymOf(t))h+='<div class="card tap" onclick="abrirSaldo()" style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px"><span class="sub">Dinheiro hoje ('+dcurto(t)+')</span><b class="mid">'+c2s(sal)+'</b></div>';
  if(!it.length)return h+'<div class="card"><div class="empty">Nada neste mês.</div></div>';
  h+='<div class="card">';var dias={},ordem=[];
- comParciais(it.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&!(x.status==='cartao')&&!adiadaVazia(x)}),M).forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
+ comParciais(it.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&!(x.status==='cartao')&&!adiadaVazia(x)&&!(x.kind==='reemb'&&x.status!=='pago')}),M).forEach(function(x){var d=x.semData?'zz':x.data;if(!dias[d]){dias[d]=[];ordem.push(d)}dias[d].push(x)});
  ordem.forEach(function(d){var futuro=d!=='zz'&&d>=t,sd=futuro&&sal!=null&&p.dias[d]?p.dias[d].saldo:null;
   h+='<div class="dayh'+(d===t?' hoje':'')+'"><span>'+(d==='zz'?'Data a confirmar':(d===t?'Hoje · ':'')+dlab(d))+'</span>'+(sd!=null?'<span class="sd'+(sd<0?' neg':'')+'">saldo '+c2s(sd)+'</span>':'')+'</div>';
   dias[d].forEach(function(x){h+=linhaItem(x,false,futuro||x.status==='atrasado'?p.dep[chaveItem(x)]:null)})});
@@ -1226,6 +1226,7 @@ function fechar(){var ov=document.getElementById('ov');if(!ov.classList.contains
    • arrastar a barrinha do topo para baixo fecha a janela. */
 var _folhaY=0;
 function folhaTrava(on){var b=document.body,de=document.documentElement;
+ if(de.classList.contains('af')){de.classList.toggle('ovOn',!!on);return} /* moldura fixa: o corpo já é fixo e só o miolo rola */
  if(on){_folhaY=window.pageYOffset||de.scrollTop||0;de.classList.add('ovOn');b.style.position='fixed';b.style.top=(-_folhaY)+'px';b.style.left='0';b.style.right='0';b.style.width='100%'}
  else{de.classList.remove('ovOn');b.style.position='';b.style.top='';b.style.left='';b.style.right='';b.style.width='';window.scrollTo(0,_folhaY)}}
 (function(){
@@ -1818,6 +1819,56 @@ window.catsUsadas=catsUsadas=function(){var n={},lim=addD(hoje(),-120);viv(S.lan
  var oM=window.vMais;window.vMais=vMais=function(){var h=oM.apply(this,arguments),k=h.indexOf('<div class="card"><h2>Contas fixas</h2>');var c=catsCardMais();return k>=0?h.slice(0,k)+c+h.slice(k):h+c};
 })();
 try{catsSeed();render()}catch(e){}
+</script>
+<style id="afCss">
+/* ===================== MOLDURA FIXA (Hudson 12/11) — a mesma do Gestão e do Multas =====================
+   No iPhone (iOS 26) a barra de baixo "afundava" ou sumia quando a página voltava ao topo (ex.: ao entrar na Agenda):
+   a barra presa à janela do iPhone ficava fora da tela. Aqui o corpo do app fica fixo na tela inteira e SÓ o miolo rola;
+   a barra fica presa ao corpo, que não se mexe. A aparência não muda. */
+html.af{height:100%!important;overflow:visible!important;overscroll-behavior:none!important}
+html.af body{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:column!important;overflow:visible!important;overscroll-behavior:none!important}
+html.af #afScroll{flex:1 1 auto;min-height:0;width:100%;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
+html.af.ovOn #afScroll{overflow:hidden!important}
+html.af body>.afFix{position:absolute!important}
+html.af.afKb body{bottom:auto!important;height:var(--afVvh,100vh)!important}
+html.af.afKb #tabs{display:none!important}
+</style>
+<script id="afJs">
+(function(){
+ var de=document.documentElement,B=document.body;if(!B||de.classList.contains('af'))return;
+ var cs=getComputedStyle(B),pt=cs.paddingTop,pb=cs.paddingBottom;
+ var sc=document.createElement('div'),mover=[];sc.id='afScroll';
+ [].slice.call(B.children).forEach(function(e){
+  if(/^(SCRIPT|STYLE|LINK|TEMPLATE|DIALOG|NOSCRIPT)$/.test(e.tagName))return;
+  var p=getComputedStyle(e).position;if(p==='fixed'){e.classList.add('afFix');return}if(p==='absolute')return;mover.push(e)});
+ if(!mover.length)return;
+ B.insertBefore(sc,B.firstChild);mover.forEach(function(e){sc.appendChild(e)});
+ sc.style.paddingTop=pt;sc.style.paddingBottom=pb;   /* o espaço que o corpo tinha (topo e barra de baixo) passa para o miolo */
+ de.classList.add('af');
+ var o1=window.scrollTo;
+ window.scrollTo=function(x,y){try{if(x&&typeof x==='object')sc.scrollTo(x);else sc.scrollTop=(Number(y)||0)}catch(e){}};
+ window.scrollBy=function(x,y){try{if(x&&typeof x==='object')sc.scrollBy(x);else sc.scrollTop+=(Number(y)||0)}catch(e){}};
+ try{Object.defineProperty(window,'scrollY',{configurable:true,get:function(){return sc.scrollTop}})}catch(e){}
+ try{Object.defineProperty(window,'pageYOffset',{configurable:true,get:function(){return sc.scrollTop}})}catch(e){}
+ window.__afScroll=sc;
+})();
+/* teclado: o app ocupa só a parte visível; a barra some */
+(function(){
+ var de=document.documentElement;if(!de.classList.contains('af'))return;
+ var vv=window.visualViewport,foco=false,aberto=false,raf=0,base=window.innerHeight;
+ var toque=false;try{toque=window.matchMedia('(pointer:coarse)').matches||('ontouchstart' in window)}catch(e){}
+ function campo(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|email|url|number|password|)$/i.test(el.type||''))||!!el.isContentEditable)&&!el.readOnly&&!el.disabled}
+ function aplicar(){raf=0;if(!foco||window.innerHeight>base)base=Math.max(window.innerHeight,foco?base:0);
+  var h=vv?vv.height:window.innerHeight,kb=vv?Math.max(0,base-vv.height,window.innerHeight-vv.height):0,agora=foco&&(toque||kb>120||!vv)||kb>150;
+  var v=Math.round(h)+'px';if(v!==de._afv){de._afv=v;de.style.setProperty('--afVvh',v)}
+  if(agora!==aberto){aberto=agora;de.classList.toggle('afKb',agora)}}
+ function agenda(){if(!raf)raf=(window.requestAnimationFrame||setTimeout)(aplicar)}
+ if(vv){vv.addEventListener('resize',agenda);vv.addEventListener('scroll',agenda)}
+ window.addEventListener('resize',agenda);window.addEventListener('orientationchange',function(){base=0;setTimeout(agenda,400)});
+ document.addEventListener('focusin',function(e){if(campo(e.target)){foco=true;agenda();setTimeout(agenda,250)}},true);
+ document.addEventListener('focusout',function(){setTimeout(function(){foco=campo(document.activeElement);agenda();setTimeout(agenda,300)},80)},true);
+ aplicar();
+})();
 </script>
 </body>
 </html>
