@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=49, APP_DATE='11/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=50, APP_DATE='12/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -417,11 +417,11 @@ function projecaoAte(ate){
   if(x.data<t){if(x.sinal<0&&ym>=S.inicio)ev.push(Object.assign({},x,{data:t,atrasado:true,dataOrig:x.data}));return}
   ev.push(x)})});
  ev.sort(function(a,b){return a.data<b.data?-1:a.data>b.data?1:(b.sinal-a.sinal)});
- var saldo=saldoTotal(),run=saldo==null?0:saldo,cumIn=0,cumInc=0,min=null,minDia=null,dias_={},prox=null,dep={},outs=[];
+ var saldo=saldoTotal(),run=saldo==null?0:saldo,cumIn=0,cumInc=0,cumPai=0,paiNasContas=0,min=null,minDia=null,dias_={},prox=null,dep={},outs=[];
  var porDia={};ev.forEach(function(x){(porDia[x.data]=porDia[x.data]||[]).push(x)});
  for(var d=t;d<=ate;d=addD(d,1)){var de=porDia[d]||[];
-  de.forEach(function(x){if(x.sinal>0){if(x.cert==='provavel'){run+=x.resta;cumIn+=x.resta}else cumInc+=x.resta;dep[chaveItem(x)]={saldo:run}}});
-  de.forEach(function(x){if(x.sinal<0){var antes=run;run-=x.resta;var o={x:x,data:d,antes:antes,saldo:run,cumIn:cumIn,cumInc:cumInc};dep[chaveItem(x)]=o;outs.push(o)}});
+  de.forEach(function(x){if(x.sinal>0){if(x.cert==='provavel'){run+=x.resta;cumIn+=x.resta;if(x.kind==='reemb')cumPai+=x.resta}else cumInc+=x.resta;dep[chaveItem(x)]={saldo:run}}});
+  de.forEach(function(x){if(x.sinal<0){var antes=run;run-=x.resta;var o={x:x,data:d,antes:antes,saldo:run,cumIn:cumIn,cumInc:cumInc,cumPai:cumPai,paiAntes:paiNasContas};dep[chaveItem(x)]=o;outs.push(o);if(x.kind==='fatura'&&x.pai>0&&x.valor>0)paiNasContas+=Math.round(x.pai*x.resta/x.valor)}});
   dias_[d]={itens:de,saldo:run};if(min==null||run<min){min=run;minDia=d}
   if(!prox&&d>t&&de.some(function(x){return x.sinal>0&&x.cert==='provavel'}))prox=d}
  return {t:t,ate:ate,ev:ev,saldo:saldo,min:min,minDia:minDia,dias:dias_,prox:prox,dep:dep,outs:outs,
@@ -520,7 +520,10 @@ function salvarSaldoRapido(cid){var v=parseBRL(val('hSaldo'));if(v==null){toast(
 function cardDecisao(o,p){var x=o.x,outras=(p.saldo==null?0:p.saldo)+o.cumIn-o.antes;
  var h='<div class="dec" onclick="'+acaoItem(x)+'"><div class="top"><div><div class="nm">'+icone(x)+' '+esc(x.titulo)+'</div><div class="when">'+(x.atrasado?'venceu '+dlab(x.dataOrig)+' · atrasado':dlab(o.data)+' · '+quando(o.data))+'</div></div><div class="amt">'+c2s(x.resta)+'</div></div>';
  if(p.saldo==null)return h+'<div class="eq"><div><span>Informe o saldo de hoje para ver se dá</span></div></div></div>';
- h+='<div class="eq"><div><span>Dinheiro hoje</span><b>'+c2s(p.saldo)+'</b></div>'+(o.cumIn?'<div><span>+ entra até lá (provável)</span><b class="pos">'+c2s(o.cumIn)+'</b></div>':'')+(outras>0?'<div><span>− contas antes desta</span><b class="neg">'+c2s(outras)+'</b></div>':'')+'<div class="tot"><span>Disponível no dia</span><b>'+c2s(o.antes)+'</b></div></div>';
+ /* Hudson 12/11: a parte do pai aparece separada — ele devolve no dia dele; a fatura paga inteira inclui a parte dele */
+ var cp=o.cumPai||0,ent=(o.cumIn||0)-cp,pa=o.paiAntes||0;
+ h+='<div class="eq"><div><span>Dinheiro hoje</span><b>'+c2s(p.saldo)+'</b></div>'+(ent?'<div><span>+ entra até lá (provável)</span><b class="pos">'+c2s(ent)+'</b></div>':'')+(cp?'<div><span>+ seu pai devolve (parte dele nos cartões)</span><b class="pos">'+c2s(cp)+'</b></div>':'')+(outras>0?'<div><span>− contas antes desta'+(pa?'<small style="display:block;font-size:12px;opacity:.75">inclui '+c2s(pa)+' do seu pai nas faturas</small>':'')+'</span><b class="neg">'+c2s(outras)+'</b></div>':'')+'<div class="tot"><span>Disponível no dia</span><b>'+c2s(o.antes)+'</b></div></div>';
+ if(x.kind==='fatura'&&x.pai>0)h+='<div class="sub" style="margin:6px 2px 0">Nesta fatura: sua parte '+c2s(suaV(x))+' · do seu pai '+c2s(x.pai)+' (ele devolve na conta dele, dia '+(cartaoPai()?(+cartaoPai().vence||24):24)+').</div>';
  var r=o.saldo;h+='<div class="res '+(r>=0?'ok':'bad')+'"><span>'+(r>=0?'Dá para pagar':'Precisa de mais')+'<small>'+(r>=0?'depois de pagar, sobra':'para cobrir, faltam')+'</small></span><span style="font-size:19px">'+c2s(Math.abs(r))+'</span></div>';
  if(r<0&&o.cumInc>0)h+='<div class="sub" style="margin-top:7px">Se as entradas incertas até lá caírem ('+c2s(o.cumInc)+'), '+(r+o.cumInc>=0?'dá e sobra '+c2s(r+o.cumInc):'ainda faltam '+c2s(-(r+o.cumInc)))+'.</div>';
  return h+'</div>'}
