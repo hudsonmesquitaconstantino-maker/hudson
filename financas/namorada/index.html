@@ -144,7 +144,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=2,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=3,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -666,7 +666,10 @@ function impPrepara(pk){var gs=(pk.cartoes||[]).map(function(c){return {ref:c.re
   g.itens.push({desc:String(x.t||'Compra').trim(),dPost:x.d,data:x.aprox?addMDia(x.d,-(i-1)):x.d,aprox:!!x.aprox,vParc:Math.round(+x.v),i:i,n:n,fat:x.fat||'',ok:true})});
  gs=gs.filter(function(g){return g.itens.length||(pk.faturas||[]).some(function(f){return f.c===g.ref})});
  gs.forEach(function(g){g.alvo=impAlvo(g,pk.csv)});
- IMP={pk:pk,grupos:gs,quitar:true};impCalc();impTela()}
+ var fx=(pk.fixas||[]).map(function(f){var ms=Object.keys(f.meses||{}).filter(function(m){return /^\d{4}-\d{2}$/.test(m)&&+f.meses[m]>0}).sort();
+  var ja=lista('fixas').some(function(x){return nrm(x.nome)===nrm(f.nome)&&nrm(x.grupo)===nrm(f.grupo)});
+  return {nome:String(f.nome||'Conta').trim(),grupo:String(f.grupo||'').trim(),dia:Math.min(31,Math.max(1,+f.dia||1)),cat:f.cat||'Outros',meses:f.meses||{},ms:ms,pagos:(f.pagos||[]).filter(function(m){return ms.indexOf(m)>=0}),ok:!ja&&ms.length>0,ja:ja}}).filter(function(f){return f.ms.length});
+ IMP={pk:pk,grupos:gs,fixas:fx,quitar:true};impCalc();impTela()}
 function impFat(g,it){var c=g.alvo&&g.alvo!=='novo'?reg('cartoes',g.alvo):{fecha:g.fecha,vence:g.vence||1};return it.fat||faturaDe(c,it.dPost)}
 function impChave(it,fat1){return nrm(it.desc).replace(/ /g,'').slice(0,14)+'|'+fat1+'|'+it.vParc+'|'+it.n}
 function impCalc(){IMP.grupos.forEach(function(g){var usados={},cid=g.alvo&&g.alvo!=='novo'?g.alvo:'',c=cid?reg('cartoes',cid):null,ls=cid?lista('lanc').filter(function(l){return l.tipo==='gasto'&&l.meio===cid}):[];
@@ -674,7 +677,7 @@ function impCalc(){IMP.grupos.forEach(function(g){var usados={},cid=g.alvo&&g.al
   if(it.ja||!c)return;var d=ls.filter(function(l){if(l.impK||usados[l.id])return false;var vv=Math.abs(l.valor-it.vParc)<=1||Math.abs(l.valor-it.vParc*it.n)<=1;if(!vv)return false;return faturaDe(c,l.data)===fi||Math.abs(diffD(l.data,it.dPost))<=7||Math.abs(diffD(l.data,it.data))<=7})[0];
   it.troca=!!(d&&it.n>1&&Math.abs(d.valor-it.vParc)<=1&&(+d.parc||1)===1);
   if(d){usados[d.id]=1;it.dup=d;if(it.okManual==null)it.ok=it.troca}else if(it.okManual==null)it.ok=true})})}
-function impTela(){var h='<h3>📥 Importar faturas</h3>',pk=IMP.pk,tot=0;
+function impTela(){var h='<h3>📥 Importar</h3>',pk=IMP.pk,tot=0,nf=0;
  IMP.grupos.forEach(function(g,gi){var cs=cartoes(),opts=(g.alvo===''?[['','Escolha o cartão…']]:[]).concat(cs.map(function(c){return [c.id,c.nome]}),[['novo','Criar cartão novo: '+g.nome]]);
   var novos=g.itens.filter(function(it){return it.ok&&!it.ja}),ja=g.itens.filter(function(it){return it.ja}).length,dups=g.itens.filter(function(it){return it.dup&&!it.ja&&!it.troca}).length,trocas=g.itens.filter(function(it){return it.troca&&it.ok&&!it.ja}).length;tot+=novos.length;
   h+='<div class="card" style="margin-top:12px"><h2>💳 '+esc(g.nome)+'</h2>'+(g.obs?'<div class="sub" style="margin:-4px 0 6px">'+esc(g.obs)+'</div>':'')+fSel('impA'+gi,'Para qual cartão do app',opts,g.alvo).replace('<select ','<select onchange="impMuda('+gi+',this.value)" ');
@@ -684,11 +687,18 @@ function impTela(){var h='<h3>📥 Importar faturas</h3>',pk=IMP.pk,tot=0;
   var fats={};g.itens.forEach(function(it){if(!it.ok||it.ja)return;for(var q=it.i;q<=it.n;q++){var y=addM(it.fat1,q-1);fats[y]=(fats[y]||0)+it.vParc}});var ys=Object.keys(fats).sort().slice(0,3);
   if(ys.length)h+='<div class="sub" style="margin-top:4px">'+ys.map(function(y){return cap(mesSo(y))+': '+c2s(fats[y])}).join(' · ')+'</div>';
   h+='<details style="margin-top:8px"><summary class="sub tap" style="font-weight:800;color:var(--rose)">Ver as '+g.itens.length+' compras</summary>'+g.itens.map(function(it,ii){return '<label class="row" style="gap:10px'+(it.ja?';opacity:.45':'')+'"><input type="checkbox" '+(it.ok&&!it.ja?'checked ':'')+(it.ja?'disabled ':'')+'onchange="impCk('+gi+','+ii+',this.checked)" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><div class="g"><div class="t">'+esc(it.desc)+(it.n>1?' <span class="pill">'+it.i+'/'+it.n+'</span>':'')+'</div><div class="s">'+(it.aprox?'comprou ~'+mesSo(ymOf(it.data)):dcurto(it.data))+' · fatura de '+mesSo(addM(it.fat1,it.i-1))+(it.ja?' · já importada':'')+(it.dup?(it.troca&&it.ok?' · <span class="lav">troca a sua “'+esc(it.dup.desc)+'” '+c2s(it.dup.valor)+' por esta, com todas as parcelas</span>':' · <span class="neg">você já lançou “'+esc(it.dup.desc)+'” '+c2s(it.dup.valor)+'</span>'):'')+'</div></div><div class="v">'+c2s(it.vParc)+'</div></label>'}).join('')+'</details></div>'});
- h+='<label style="display:flex;gap:10px;align-items:flex-start;margin:14px 2px;font-weight:700"><input type="checkbox" '+(IMP.quitar?'checked ':'')+'onchange="IMP.quitar=this.checked" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><span>As faturas que já venceram já estão pagas<br><span class="sub" style="font-weight:600">Ficam marcadas como pagas, sem mexer no saldo.</span></span></label>';
- h+='<div class="sub" style="margin-bottom:6px">As compras entram com um palpite de categoria e ficam na lista “para classificar”. Dá para editar ou apagar qualquer uma depois.</div>';
- var ok=IMP.grupos.every(function(g){return g.alvo})&&tot>0;
+ var fg={};IMP.fixas.forEach(function(f,fi){(fg[f.grupo]=fg[f.grupo]||[]).push(fi)});
+ Object.keys(fg).forEach(function(gn){var ids=fg[gn],porMes={};ids.forEach(function(fi){var f=IMP.fixas[fi];if(!f.ok)return;f.ms.forEach(function(m){if(f.pagos.indexOf(m)<0)porMes[m]=(porMes[m]||0)+Math.round(+f.meses[m])})});
+  var ms=Object.keys(porMes).sort(),falta=soma(ms,function(m){return porMes[m]});
+  h+='<div class="card" style="margin-top:12px"><h2>🤍 '+esc(gn?tituloGrupo(gn):'Contas fixas')+'</h2><div class="sub" style="margin:-4px 0 6px">Cada conta separada, com o valor de cada mês. Os meses com ✅ entram como já pagos (sem mexer no saldo).</div>'+
+   ids.map(function(fi){var f=IMP.fixas[fi];if(f.ok&&!f.ja)nf++;var pg=f.pagos.length,v0=Math.round(+f.meses[f.ms[0]]),v1=Math.round(+f.meses[f.ms[f.ms.length-1]]);
+    return '<label class="row" style="gap:10px'+(f.ja?';opacity:.45':'')+'"><input type="checkbox" '+(f.ok&&!f.ja?'checked ':'')+(f.ja?'disabled ':'')+'onchange="IMP.fixas['+fi+'].ok=this.checked;impTela()" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">todo dia '+f.dia+' · '+mesSo(f.ms[0]).slice(0,3)+'/'+f.ms[0].slice(2,4)+' a '+mesSo(f.ms[f.ms.length-1]).slice(0,3)+'/'+f.ms[f.ms.length-1].slice(2,4)+' · '+f.ms.length+' meses'+(pg?' · '+pg+' pago'+(pg>1?'s':''):'')+(v0!==v1?' · '+c2s(v0)+' → '+c2s(v1):'')+(f.ja?' · já está no app':'')+'</div></div><div class="v">'+c2s(v1)+'</div></label>'}).join('')+
+   (ms.length?'<div class="hr"></div>'+ms.slice(0,4).map(function(m){return '<div class="kv"><span style="text-transform:capitalize">'+mesNome(m)+'</span><b>'+c2s(porMes[m])+'</b></div>'}).join('')+'<div class="kv"><span><b>Falta pagar no total</b></span><b>'+c2s(falta)+'</b></div>':'')+'</div>'});
+ if(IMP.grupos.length)h+='<label style="display:flex;gap:10px;align-items:flex-start;margin:14px 2px;font-weight:700"><input type="checkbox" '+(IMP.quitar?'checked ':'')+'onchange="IMP.quitar=this.checked" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><span>As faturas que já venceram já estão pagas<br><span class="sub" style="font-weight:600">Ficam marcadas como pagas, sem mexer no saldo.</span></span></label>';
+ if(IMP.grupos.length)h+='<div class="sub" style="margin-bottom:6px">As compras entram com um palpite de categoria e ficam na lista “para classificar”. Dá para editar ou apagar qualquer uma depois.</div>';
+ var ok=IMP.grupos.every(function(g){return g.alvo})&&tot+nf>0,rot=[];if(tot||!nf)rot.push(tot+' compra'+(tot!==1?'s':''));if(nf)rot.push(nf+' conta'+(nf!==1?'s':''));
  var sh=document.getElementById('sheet'),st=document.getElementById('ov').classList.contains('open')?sh.scrollTop:0;
- abrir(h+'<button class="btn" '+(ok?'':'disabled style="opacity:.5" ')+'onclick="impOk()">Importar '+tot+' compra'+(tot!==1?'s':'')+'</button><button class="btn sec" onclick="IMP=null;fechar()">Cancelar</button>');sh.scrollTop=st}
+ abrir(h+'<button class="btn" '+(ok?'':'disabled style="opacity:.5" ')+'onclick="impOk()">Importar '+rot.join(' e ')+'</button><button class="btn sec" onclick="IMP=null;fechar()">Cancelar</button>');sh.scrollTop=st}
 function impMuda(gi,v){IMP.grupos[gi].alvo=v;IMP.grupos[gi].itens.forEach(function(it){it.okManual=null});impCalc();impTela()}
 function impCk(gi,ii,on){var it=IMP.grupos[gi].itens[ii];it.ok=on;it.okManual=on;var ds=document.querySelectorAll('#sheet details'),ab=[].map.call(ds,function(d){return d.open});impTela();[].forEach.call(document.querySelectorAll('#sheet details'),function(d,i){d.open=!!ab[i]})}
 function impOk(){if(!IMP)return;if(IMP.grupos.some(function(g){return !g.alvo})){toast('Escolha o cartão de cada fatura');return}
@@ -702,13 +712,22 @@ function impOk(){if(!IMP)return;if(IMP.grupos.some(function(g){return !g.alvo}))
    undo.push(['lanc',l.id]);n++;m++;if(!tocou[cid]||f1<tocou[cid])tocou[cid]=f1});
   (IMP.pk.faturas||[]).forEach(function(f){if(f.c!==g.ref||!f.ym)return;var k=cid+'|'+f.ym,ex=S.faturas[k]&&!S.faturas[k].del,p={del:false};if(f.banco!=null)p.banco=Math.round(+f.banco);if(f.quitada)p.quitada=1;muda('faturas',k,p);if(!ex)undo.push(['faturas',k]);if(!tocou[cid])tocou[cid]=f.ym})});
  if(IMP.quitar)Object.keys(tocou).forEach(function(cid){var c=reg('cartoes',cid);for(var ym=tocou[cid],z=0;z<60;z++,ym=addM(ym,1)){if(diaNoMes(ym,+c.vence||1)>=hoje())break;var k=cid+'|'+ym,x=fatura(cid,ym);if(x.resta>0){var ex=S.faturas[k]&&!S.faturas[k].del;muda('faturas',k,{quitada:1,del:false});if(!ex)undo.push(['faturas',k])}}});
- if(n)muda('cfg','geral',{imps:(cfg().imps||[]).concat([{id:lote,em:hoje(),n:n,onde:nomes.join(', ')}]).slice(-20)});
- IMP=null;fechar();render();toast(n+' compra'+(n!==1?'s':'')+' importada'+(n!==1?'s':'')+' 💖',undo)}
-function impDesfazer(lote){var ls=lista('lanc').filter(function(l){return l.imp===lote});if(!confirm('Apagar as '+ls.length+' compras desta importação? (as que você já editou também)'))return;
+ var nf=0,cp=contaPadrao(),gfx={};
+ (IMP.fixas||[]).forEach(function(f){if(!f.ok||f.ja)return;var cont={};f.ms.forEach(function(m){var v=Math.round(+f.meses[m]);cont[v]=(cont[v]||0)+1});var base=+Object.keys(cont).sort(function(a,b){return cont[b]-cont[a]||b-a})[0];
+  var x=put('fixas',{nome:f.nome,valor:base,dia:f.dia,cat:f.cat,meio:'conta',grupo:f.grupo,inicio:f.ms[0],fim:f.ms[f.ms.length-1],imp:lote});undo.push(['fixas',x.id]);nf++;if(f.grupo)gfx[tituloGrupo(f.grupo)]=1;
+  f.ms.forEach(function(m){var v=Math.round(+f.meses[m]);if(v!==base){var k=x.id+'|'+m;put('fixasMes',{id:k,valor:v,imp:lote});undo.push(['fixasMes',k])}});
+  f.pagos.forEach(function(m){var d=diaNoMes(m,f.dia);var l=put('lanc',{tipo:'pagfixa',ref:'fixa|'+x.id+'|'+m,valor:Math.round(+f.meses[m]),meio:cp,data:d>hoje()?hoje():d,desc:f.nome,fora:1,imp:lote});undo.push(['lanc',l.id])})});
+ nomes=nomes.concat(Object.keys(gfx));
+ if(n||nf)muda('cfg','geral',{imps:(cfg().imps||[]).concat([{id:lote,em:hoje(),n:n,nf:nf,onde:nomes.join(', ')}]).slice(-20)});
+ var msg=[];if(n||!nf)msg.push(n+' compra'+(n!==1?'s':''));if(nf)msg.push(nf+' conta'+(nf!==1?'s':''));
+ IMP=null;fechar();render();toast(msg.join(' e ')+' importada'+(n+nf!==1?'s':'')+' 💖',undo)}
+function impDesfazer(lote){var ls=lista('lanc').filter(function(l){return l.imp===lote}),fs=lista('fixas').filter(function(f){return f.imp===lote}),nc=ls.filter(function(l){return l.tipo==='gasto'}).length;
+ if(!confirm('Desfazer esta importação? Apaga '+(nc?nc+' compra'+(nc>1?'s':''):'')+(nc&&fs.length?' e ':'')+(fs.length?fs.length+' conta'+(fs.length>1?'s':'')+' fixa'+(fs.length>1?'s':''):'')+' (mesmo as que você já editou).'))return;
+ fs.forEach(function(f){apaga('fixas',f.id)});lista('fixasMes').forEach(function(o){if(o.imp===lote)apaga('fixasMes',o.id)});
  ls.forEach(function(l){apaga('lanc',l.id);if(l.trocou&&S.lanc[l.trocou])muda('lanc',l.trocou,{del:false})});muda('cfg','geral',{imps:(cfg().imps||[]).filter(function(x){return x.id!==lote})});render();toast('Importação desfeita')}
-function cardImportar(){var im=(cfg().imps||[]).filter(function(x){return lista('lanc').some(function(l){return l.imp===x.id})});
+function cardImportar(){var im=(cfg().imps||[]).filter(function(x){return lista('lanc').some(function(l){return l.imp===x.id})||lista('fixas').some(function(f){return f.imp===x.id})});
  return '<div class="card"><h2>📥 Importar faturas</h2><div class="sub">O arquivo do Nubank (.csv) ou o pacote que o Hudson mandar (.json). Cada compra entra no cartão com as parcelas nos meses certos — depois é só classificar.</div><button class="btn sm" onclick="document.getElementById(\'arqImp\').click()">Escolher arquivo</button>'+
-  (im.length?'<div class="hr"></div>'+im.map(function(x){var q=lista('lanc').filter(function(l){return l.imp===x.id}).length;return '<div class="kv"><span>'+dbr(x.em)+' · '+esc(x.onde)+' · '+q+' compras</span><a class="sub tap" style="color:var(--coral);font-weight:800" onclick="impDesfazer(\''+x.id+'\')">desfazer</a></div>'}).join(''):'')+'</div>'}
+  (im.length?'<div class="hr"></div>'+im.map(function(x){var q=lista('lanc').filter(function(l){return l.imp===x.id&&l.tipo==='gasto'}).length,qf=lista('fixas').filter(function(f){return f.imp===x.id}).length;return '<div class="kv"><span>'+dbr(x.em)+' · '+esc(x.onde)+' · '+[q?q+' compras':'',qf?qf+' contas':''].filter(Boolean).join(' e ')+'</span><a class="sub tap" style="color:var(--coral);font-weight:800" onclick="impDesfazer(\''+x.id+'\')">desfazer</a></div>'}).join(''):'')+'</div>'}
 function cardClassificar(){var n=lista('lanc').filter(precisaClassificar).length;if(!n)return '';
  return '<div class="card tap" onclick="abrirClassificar()" style="background:var(--lav2);box-shadow:none"><div class="kv" style="padding:0"><b class="lav">🏷️ '+n+' compra'+(n>1?'s':'')+' para classificar</b><span class="lav" style="font-size:20px">›</span></div><div class="sub" style="margin-top:3px">Vieram das faturas. Toque e escolha a categoria de cada uma.</div></div>'}
 
