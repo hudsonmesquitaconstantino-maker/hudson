@@ -135,6 +135,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
 <div id="ov" onclick="if(event.target===this)fechar()"><div id="sheet"></div></div>
 <div id="toast" role="status"></div>
 <input type="file" id="arq" accept=".json,application/json" style="display:none" onchange="importar(this)">
+<input type="file" id="arqImp" accept=".csv,.json,.txt,text/csv,application/json,text/plain" style="display:none" onchange="impArquivo(this)">
 <script>
 'use strict';
 /* =====================================================================
@@ -143,7 +144,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=1,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=2,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -204,7 +205,7 @@ var CAT_RE=[[/mercad|supermerc|assa[ií]|atacad|hortifr|padaria/i,'Mercado'],[/i
  [/curso|faculdade|aula|livro|apostila/i,'Cursos'],[/pet|ra[cç][aã]o|veterin/i,'Pet'],[/passagem|hotel|airbnb|viagem/i,'Viagem'],[/juros|tarifa|anuidade|iof|multa/i,'Juros e taxas'],
  [/c[aâ]mera|microfone|ilumina|ring ?light|trip[eé]|celular|computador|notebook|equipamento|cliente|freela|tr[aá]fego|meta ads|an[uú]ncio/i,'Trabalho']];
 function sugCat(t){t=String(t||'');for(var i=0;i<CAT_RE.length;i++)if(CAT_RE[i][0].test(t))return CAT_RE[i][1];return ''}
-var CAT_IC={'Mercado':'🛒','Alimentação':'🍽️','iFood e delivery':'🛵','Beleza':'💅','Roupas e acessórios':'👗','Casa':'🏡','Contas da casa':'💡','Transporte':'⛽','Uber e 99':'🚕','Saúde':'🩺','Farmácia':'💊','Academia':'🧘‍♀️','Lazer':'🎬','Presentes':'🎁','Assinaturas':'📺','Trabalho':'💼','Cursos':'📚','Pet':'🐾','Viagem':'✈️','Juros e taxas':'🧾','Outros':'✨'};
+var CAT_IC={'Mercado':'🛒','Alimentação':'🍽️','iFood e delivery':'🛵','Beleza':'💅','Roupas e acessórios':'👗','Casa':'🏡','Contas da casa':'💡','Transporte':'⛽','Uber e 99':'🚕','Saúde':'🩺','Farmácia':'💊','Academia':'🧘‍♀️','Lazer':'🎬','Presentes':'🎁','Assinaturas':'📺','Trabalho':'💼','Cursos':'📚','Pet':'🐾','Viagem':'✈️','Juros e taxas':'🧾','Outros':'✨','A classificar':'❓'};
 function icCat(c){return CAT_IC[c]||'🏷️'}
 
 /* ---------- contas (bancos) ---------- */
@@ -230,14 +231,15 @@ function fixaVigente(f,ym){return !(f.del||(f.inicio&&f.inicio>ym)||(f.fim&&ym>f
 function fixaMesO(f,ym){return S.fixasMes[f.id+'|'+ym]||{}}
 function valorFixa(f,ym){var o=fixaMesO(f,ym);if(o.apagada&&!o.del)return 0;return o.valor!=null&&!o.del?o.valor:(f.valor||0)}
 function itensFatura(cid,ym){var c=reg('cartoes',cid),out=[];if(!c)return out;
- lista('lanc').forEach(function(l){if(l.tipo!=='gasto'||l.meio!==cid)return;var n=Math.max(1,+l.parc||1),base=faturaDe(c,l.data);
-  for(var i=0;i<n;i++)if(addM(base,i)===ym)out.push({kind:'lanc',l:l,v:parcV(l.valor,n,i),i:i+1,n:n,data:l.data,nome:l.desc||l.cat||'Compra'})});
+ lista('lanc').forEach(function(l){if(l.tipo!=='gasto'||l.meio!==cid)return;var n=Math.max(1,+l.parc||1),base=l.fat1||faturaDe(c,l.data);
+  for(var i=0;i<n;i++)if(addM(base,i)===ym)out.push({kind:'lanc',l:l,v:l.vParc!=null?l.vParc:parcV(l.valor,n,i),i:i+1,n:n,data:l.data,nome:l.desc||l.cat||'Compra'})});
  lista('fixas').forEach(function(f){if(f.meio!==cid)return;for(var k=-2;k<=1;k++){var mm=addM(ym,k);if(!fixaVigente(f,mm)||fixaMesO(f,mm).apagada)continue;var dt=diaNoMes(mm,f.dia||1);
   if(faturaDe(c,dt)===ym)out.push({kind:'fixa',f:f,v:valorFixa(f,mm),data:dt,nome:f.nome})}});
  out.sort(function(a,b){return a.data<b.data?1:a.data>b.data?-1:0});return out}
 function fatura(cid,ym){var k=cid+'|'+ym,f=S.faturas[k]&&!S.faturas[k].del?S.faturas[k]:{},its=itensFatura(cid,ym),c=reg('cartoes',cid)||{};
- var sm=soma(its,function(x){return x.v}),valor=f.banco!=null?f.banco:sm,pags=lista('lanc').filter(function(l){return l.tipo==='pagfatura'&&l.ref===k}),pago=soma(pags,function(l){return l.valor});
- return {k:k,cid:cid,ym:ym,nome:c.nome||'?',vence:diaNoMes(ym,+c.vence||1),valor:valor,soma:sm,banco:f.banco,its:its,pags:pags,pago:pago,resta:Math.max(0,valor-pago),estimado:f.banco==null}}
+ var sm=soma(its,function(x){return x.v}),valor=f.banco!=null?f.banco:sm,pags=lista('lanc').filter(function(l){return l.tipo==='pagfatura'&&l.ref===k}),pago=soma(pags,function(l){return l.valor}),quit=!!f.quitada;
+ if(quit)pago=Math.max(pago,valor);
+ return {k:k,cid:cid,ym:ym,nome:c.nome||'?',vence:diaNoMes(ym,+c.vence||1),valor:valor,soma:sm,banco:f.banco,its:its,pags:pags,pago:pago,resta:Math.max(0,valor-pago),estimado:f.banco==null,quitada:quit}}
 function limiteCartao(c){if(!c.limite)return null;var t=hoje(),uso=0;for(var i=-1;i<=24;i++){var x=fatura(c.id,addM(ymOf(t),i));if(x.vence<t)continue;uso+=Math.max(0,(i<=1?x.valor:soma(x.its.filter(function(z){return z.kind==='lanc'}),function(z){return z.v}))-x.pago)}return {limite:c.limite,uso:uso,disp:c.limite-uso}}
 
 /* ---------- a receber: clientes fixos (todo mês) e trabalhos (uma vez) ---------- */
@@ -316,6 +318,7 @@ function vInicio(){var t=hoje(),h='';
  var rec=its.filter(function(x){return x.sinal>0&&x.resta>0&&x.data<=lim}).sort(function(a,b){return a.data<b.data?-1:1}),pag=its.filter(function(x){return x.sinal<0&&x.resta>0&&x.data<=lim}).sort(function(a,b){return a.data<b.data?-1:1});
  h+='<div class="card"><h2>Para receber</h2>'+(rec.length?rec.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nada para receber nos próximos 10 dias.</div>')+'<button class="btn sm sec" onclick="go(\'receber\')">Ver tudo a receber ›</button></div>';
  h+='<div class="card"><h2>Para pagar</h2>'+(pag.length?pag.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nenhuma conta nos próximos 10 dias. 🌿</div>')+'</div>';
+ h+=cardsGrupos()+cardClassificar();
  /* gastos do mês (resumo) */
  var g=gastosMes(ymOf(t));if(g.tot>0){var ks=Object.keys(g.cat).sort(function(a,b){return g.cat[b]-g.cat[a]}).slice(0,3);
   h+='<div class="card tap" onclick="go(\'gastos\')"><div class="kv" style="padding:0"><h2 style="margin:0">Gastos de '+mesSo(ymOf(t))+'</h2><b>'+c2s(g.tot)+'</b></div>'+ks.map(function(k){var pc=g.cat[k]/g.tot*100;return '<div class="catr"><div class="kv"><span>'+icCat(k)+' '+esc(k)+'</span><b>'+Math.round(pc)+'%</b></div><div class="cb"><i style="width:'+Math.max(3,pc)+'%"></i></div></div>'}).join('')+'<div class="sub" style="margin-top:6px">toque para ver tudo ›</div></div>'}
@@ -365,7 +368,7 @@ function vGastos(){var h=mnav(),g=gastosMes(M),ks=Object.keys(g.cat).sort(functi
  h+='<div class="card"><h2>🛍️ Compras recentes</h2>'+(ord.length?ord.map(function(d){return '<div class="dayh'+(d===hoje()?' hoje':'')+'"><span>'+(d===hoje()?'Hoje · ':'')+dlab(d)+'</span><span>'+c2s(soma(dias[d],function(l){return l.valor}))+'</span></div>'+dias[d].map(linhaGasto).join('')}).join(''):'<div class="empty">Nenhum gasto lançado em '+mesSo(M)+'. Toque no + para lançar.</div>')+'</div>';
  return h}
 function linhaGasto(l){var n=Math.max(1,+l.parc||1),onde=ehCartao(l.meio)?'💳 '+esc(reg('cartoes',l.meio).nome):'Pix · '+esc(nomeMeio(l.meio)||'conta');
- return '<div class="row tap" onclick="abrirLanc(\''+l.id+'\')"><div class="bub out">'+icCat(l.cat)+'</div><div class="g"><div class="t">'+esc(l.desc||l.cat||'Gasto')+'</div><div class="s">'+onde+' · '+esc(l.cat||'Outros')+(n>1?' · '+n+'x de '+c2s(parcV(l.valor,n,0)):'')+'</div></div><div class="v">'+c2s(l.valor)+'</div></div>'}
+ return '<div class="row tap" onclick="abrirLanc(\''+l.id+'\')"><div class="bub out">'+icCat(l.cat)+'</div><div class="g"><div class="t">'+esc(l.desc||l.cat||'Gasto')+'</div><div class="s">'+onde+' · '+(precisaClassificar(l)?'<span class="pill lav">'+esc(l.cat==='A classificar'?'a classificar':l.cat+'?')+'</span>':esc(l.cat||'Outros'))+(n>1?' · '+n+'x de '+c2s(l.vParc!=null?l.vParc:parcV(l.valor,n,0)):'')+'</div></div><div class="v">'+c2s(l.valor)+'</div></div>'}
 function abrirCat(cat){var g=gastosMes(M),its=g.gs.filter(function(l){return (l.cat||'Outros')===cat}),fx=lista('fixas').filter(function(f){return fixaVigente(f,M)&&(f.cat||'Contas da casa')===cat&&valorFixa(f,M)>0});
  var h='<h3>'+icCat(cat)+' '+esc(cat)+'</h3><div class="sub">'+mesNome(M)+'</div><div class="card" style="margin-top:12px;text-align:center"><div class="sub">Gasto no mês</div><div class="big">'+c2s(g.cat[cat]||0)+'</div></div>';
  h+='<div class="card">'+its.map(linhaGasto).join('')+fx.map(function(f){return '<div class="row"><div class="bub lav">📌</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">conta fixa</div></div><div class="v">'+c2s(valorFixa(f,M))+'</div></div>'}).join('')+((its.length+fx.length)?'':'<div class="empty">Nada nesta categoria.</div>')+'</div>';
@@ -375,7 +378,7 @@ function abrirCat(cat){var g=gastosMes(M),its=g.gs.filter(function(l){return (l.
 
 /* ---------- CARTÕES ---------- */
 var CORES=['linear-gradient(135deg,#E8789E,#B4508F)','linear-gradient(135deg,#9B7AD6,#6E57B8)','linear-gradient(135deg,#F2A27A,#D96B6B)','linear-gradient(135deg,#5FB8A0,#3A8F86)','linear-gradient(135deg,#3B3343,#6B5A70)','linear-gradient(135deg,#E9B85C,#C98A1E)'];
-function vCartoes(){var h=mnav(),cs=cartoes();
+function vCartoes(){var h=mnav()+cardClassificar(),cs=cartoes();
  if(!cs.length)return h+'<div class="card"><div class="empty">Nenhum cartão ainda.</div><button class="btn" onclick="abrirCartao()">Cadastrar cartão</button></div>';
  var tot=0;cs.forEach(function(c,i){var x=fatura(c.id,M);tot+=x.valor;var L=limiteCartao(c),pg=x.valor>0?Math.min(100,x.pago/x.valor*100):0;
   h+='<div class="tap" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')" style="border-radius:24px;padding:18px;margin:0 0 14px;color:#fff;background:'+(CORES[c.cor==null?i%CORES.length:c.cor])+';box-shadow:0 10px 26px rgba(120,60,110,.22)">'+
@@ -390,21 +393,25 @@ function vCartoes(){var h=mnav(),cs=cartoes();
 function abrirFatura(cid,ym){var x=fatura(cid,ym),c=reg('cartoes',cid);
  var h='<h3>Fatura '+esc(x.nome)+'</h3><div class="sub">'+cap(mesNome(ym))+' · vence '+dlab(x.vence)+'</div>';
  h+='<div class="card" style="margin-top:12px"><div class="tri"><div><span>Fatura</span><b>'+c2s(x.valor)+'</b></div><div><span>Pago</span><b class="pos">'+c2s(x.pago)+'</b></div><div><span>Falta</span><b class="'+(x.resta?'neg':'pos')+'">'+c2s(x.resta)+'</b></div></div>'+(x.estimado?'<div class="sub" style="margin-top:8px;text-align:center">Valor pela soma das compras lançadas. Quando chegar a fatura, corrija com o valor do banco.</div>':'')+'</div>';
- if(x.resta>0)h+=botoesPagar('fat',cid,ym,x.resta,false);
+ var nRev=x.its.filter(function(i){return i.kind==='lanc'&&precisaClassificar(i.l)}).length;
+ if(nRev)h+='<button class="btn" style="background:var(--lav)" onclick="abrirClassificar(\''+cid+'\',\''+ym+'\')">🏷️ Classificar '+nRev+' compra'+(nRev>1?'s':'')+'</button>';
+ if(x.quitada)h+='<div class="card" style="background:var(--mint2);box-shadow:none;text-align:center"><b class="pos">Fatura paga ✓</b><div class="sub" style="margin-top:4px">Marcada como paga fora do app — não mexe no saldo.</div><button class="btn sm sec" onclick="fatQuitar(\''+cid+'\',\''+ym+'\',0)">Desmarcar</button></div>';
+ else if(x.resta>0){h+=botoesPagar('fat',cid,ym,x.resta,false);if(x.vence<hoje())h+='<button class="btn sec" onclick="fatQuitar(\''+cid+'\',\''+ym+'\',1)">Já paguei antes (não mexe no saldo)</button>'}
  h+=maisOpcoes(fMoney('fBanco','Valor que o banco cobra',x.banco,'Deixe vazio para usar a soma das compras ('+c2s(x.soma)+').')+'<button class="btn" onclick="salvarFatura(\''+cid+'\',\''+ym+'\')">Salvar valor</button>',x.estimado?'Digitar o valor da fatura do banco':'Corrigir o valor da fatura');
  h+=listaPags(x.pags,false);
- h+='<div class="card"><h2>Compras ('+x.its.length+')</h2>'+(x.its.length?x.its.map(function(i){return '<div class="row tap" onclick="'+(i.kind==='lanc'?"abrirLanc('"+i.l.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="bub out">'+icCat(i.kind==='lanc'?i.l.cat:i.f.cat)+'</div><div class="g"><div class="t">'+esc(i.nome)+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+dlab(i.data)+(i.kind==='fixa'?' · conta fixa':'')+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'}).join(''):'<div class="empty">Nenhuma compra nesta fatura.</div>')+'</div>';
+ h+='<div class="card"><h2>Compras ('+x.its.length+')</h2>'+(x.its.length?x.its.map(function(i){var lc=i.kind==='lanc'?i.l:null;return '<div class="row tap" onclick="'+(lc?"abrirLanc('"+lc.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="bub out">'+icCat(lc?lc.cat:i.f.cat)+'</div><div class="g"><div class="t">'+esc(i.nome)+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+(lc&&lc.dataAprox?'comprou ~'+mesSo(ymOf(i.data)):dlab(i.data))+(i.kind==='fixa'?' · conta fixa':' · '+(lc&&precisaClassificar(lc)?'<span class="pill lav">'+esc(lc.cat==='A classificar'?'a classificar':lc.cat+'?')+'</span>':esc(lc.cat||'Outros')))+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'}).join(''):'<div class="empty">Nenhuma compra nesta fatura.</div>')+'</div>';
  abrir(h+'<button class="btn sec" onclick="abrirCartao(\''+cid+'\')">Editar o cartão</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
-function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco'));put('faturas',{id:k,banco:b==null?null:b});fechar();render();toast('Fatura atualizada')}
+function fatQuitar(cid,ym,on){muda('faturas',cid+'|'+ym,{quitada:on?1:0,del:false});abrirFatura(cid,ym);render();toast(on?'Fatura marcada como paga':'Desmarcada')}
+function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco'));muda('faturas',k,{banco:b==null?null:b,del:false});fechar();render();toast('Fatura atualizada')}
 
 /* ---------- MAIS ---------- */
 function vMais(){var h='',cs=contas();
  h+='<div class="card"><h2>🏦 Bancos e saldos</h2>'+(cs.length?cs.map(function(c){var s=saldoConta(c);return '<div class="row tap" onclick="abrirConta(\''+c.id+'\')"><div class="bub lav">🏦</div><div class="g"><div class="t">'+esc(c.nome)+'</div><div class="s">'+(c.saldoIni==null?'saldo a informar':'saldo informado em '+dbr(c.dataIni))+'</div></div><div class="v">'+(s==null?'—':c2s(s))+'</div></div>'}).join(''):'<div class="empty">Nenhum banco ainda.</div>')+'<button class="btn sm sec" onclick="abrirConta()">+ Banco</button>'+(cs.length>1?'<button class="btn sm sec" onclick="lancar(\'transf\')">Transferir entre bancos</button>':'')+'</div>';
  var fx=lista('fixas').filter(function(f){return !f.fim||f.fim>=ymOf(hoje())}).sort(function(a,b){return (a.dia||0)-(b.dia||0)});
- h+='<div class="card"><h2>📌 Contas fixas</h2>'+(fx.length?fx.map(function(f){return '<div class="row tap" onclick="abrirFixa(\''+f.id+'\')"><div class="bub out">'+icCat(f.cat)+'</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">todo dia '+(f.dia||'?')+' · '+(ehCartao(f.meio)?'no '+esc(nomeMeio(f.meio)):'boleto/Pix')+'</div></div><div class="v">'+c2s(f.valor)+'</div></div>'}).join(''):'<div class="empty">Nenhuma conta fixa.</div>')+'<button class="btn sm sec" onclick="abrirFixa()">+ Conta fixa</button></div>';
+ h+='<div class="card"><h2>📌 Contas fixas</h2>'+(fx.length?fx.map(function(f){return '<div class="row tap" onclick="abrirFixa(\''+f.id+'\')"><div class="bub out">'+icCat(f.cat)+'</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">todo dia '+(f.dia||'?')+' · '+(ehCartao(f.meio)?'no '+esc(nomeMeio(f.meio)):'boleto/Pix')+(f.grupo?' · '+esc(tituloGrupo(f.grupo).toLowerCase()):'')+(f.fim?' · até '+mesSo(f.fim)+'/'+f.fim.slice(2,4):'')+'</div></div><div class="v">'+c2s(f.valor)+'</div></div>'}).join(''):'<div class="empty">Nenhuma conta fixa.</div>')+'<button class="btn sm sec" onclick="abrirFixa()">+ Conta fixa</button></div>';
  h+='<div class="card"><h2>💼 Clientes fixos</h2>'+(clientes().length?clientes().map(function(c){return '<div class="row tap" onclick="abrirCliente(\''+c.id+'\')"><div class="bub in">💼</div><div class="g"><div class="t">'+esc(c.nome)+'</div><div class="s">todo dia '+(c.dia||'?')+(c.fim?' · até '+mesNome(c.fim):'')+(c.incerto?' · incerto':'')+'</div></div><div class="v pos">'+c2s(c.valor)+'</div></div>'}).join(''):'<div class="empty">Nenhum cliente fixo.</div>')+'<button class="btn sm sec" onclick="abrirCliente()">+ Cliente fixo</button></div>';
  h+='<div class="card"><h2>🏷️ Suas categorias</h2><div class="sub">Além das que já vêm no app. Aparecem na hora de lançar um gasto.</div><div class="chips" style="margin-top:10px">'+lista('cats').map(function(c){return '<button onclick="catApagar(\''+c.id+'\')">'+esc(c.nome)+' ✕</button>'}).join('')+'</div><div class="f"><input id="novaCat" placeholder="Nova categoria (ex.: Faculdade)"></div><button class="btn sm sec" onclick="catCriar()">+ Criar categoria</button></div>';
- h+=cardNuvem();
+ h+=cardImportar();h+=cardNuvem();
  h+='<div class="card"><h2>💾 Cópia de segurança</h2><div class="sub">Um arquivo com todos os seus dados, para guardar onde quiser.</div><button class="btn sm sec" onclick="exportar()">Baixar cópia</button><button class="btn sm sec" onclick="document.getElementById(\'arq\').click()">Restaurar de um arquivo</button></div>';
  h+='<div class="sub" style="text-align:center;margin:8px 0 14px">Namorada · v'+APP_VER+' de '+APP_DATE+'</div>';
  return h}
@@ -415,7 +422,7 @@ function catApagar(id){var c=reg('cats',id);if(!c||!confirm('Apagar a categoria 
 function abrir(h){var ov=document.getElementById('ov'),sh=document.getElementById('sheet');sh.innerHTML=h;ov.classList.add('open');sh.scrollTop=0}
 function fechar(){document.getElementById('ov').classList.remove('open');document.getElementById('sheet').innerHTML=''}
 function toast(m,undo){var t=document.getElementById('toast');t.innerHTML=esc(m)+(undo?'<button onclick="desfazerRapido()">Desfazer</button>':'');toast._u=undo||null;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('on');toast._u=null},undo?6000:2600)}
-function desfazerRapido(){var u=toast._u;toast._u=null;if(!u)return;u.forEach(function(x){apaga(x[0],x[1])});render();if(document.getElementById('ov').classList.contains('open'))fechar();toast('Desfeito')}
+function desfazerRapido(){var u=toast._u;toast._u=null;if(!u)return;u.forEach(function(x){if(x[2]==='volta')muda(x[0],x[1],{del:false});else apaga(x[0],x[1])});render();if(document.getElementById('ov').classList.contains('open'))fechar();toast('Desfeito')}
 function fMoney(id,label,c,help){return '<div class="f"><label>'+label+'</label><input id="'+id+'" class="money" inputmode="decimal" placeholder="0,00" value="'+c2in(c)+'">'+(help?'<small>'+help+'</small>':'')+'</div>'}
 function fTxt(id,label,v,ph,help){return '<div class="f"><label>'+label+'</label><input id="'+id+'" value="'+esc(v||'')+'" placeholder="'+esc(ph||'')+'" autocomplete="off">'+(help?'<small>'+help+'</small>':'')+'</div>'}
 function fNum(id,label,v,ph){return '<div class="f"><label>'+label+'</label><input id="'+id+'" inputmode="numeric" value="'+esc(v==null?'':v)+'" placeholder="'+esc(ph||'')+'"></div>'}
@@ -460,12 +467,19 @@ function clienteParou(id){var c=reg('clientes',id);muda('clientes',id,{fim:ymOf(
 function listaClientes(){abrir('<h3>Clientes fixos</h3><div class="card" style="margin-top:12px">'+clientes().map(function(c){return '<div class="row tap" onclick="abrirCliente(\''+c.id+'\')"><div class="bub in">💼</div><div class="g"><div class="t">'+esc(c.nome)+'</div><div class="s">todo dia '+c.dia+(c.fim?' · até '+mesNome(c.fim):'')+'</div></div><div class="v pos">'+c2s(c.valor)+'</div></div>'}).join('')+'</div><button class="btn sec" onclick="fechar()">Fechar</button>')}
 
 /* ---------- contas fixas ---------- */
-function abrirFixa(id){var f=id?reg('fixas',id):null,meios=[['conta','Boleto, Pix ou débito']].concat(cartoes().map(function(c){return [c.id,'No cartão '+c.nome]}));
+function fMes(id,label,v,help){return '<div class="f"><label>'+label+'</label><input id="'+id+'" type="month" value="'+esc(v||'')+'">'+(help?'<small>'+help+'</small>':'')+'</div>'}
+function abrirFixa(id,grupo){var f=id?reg('fixas',id):null,meios=[['conta','Boleto, Pix ou débito']].concat(cartoes().map(function(c){return [c.id,'No cartão '+c.nome]}));
  abrir('<h3>'+(f?esc(f.nome):'Conta fixa')+'</h3><div class="sub">O que vence todo mês: aluguel, internet, academia, assinatura…</div>'+fTxt('xNome','Nome',f?f.nome:'','Ex.: Internet')+fMoney('xVal','Valor de sempre',f?f.valor:null,'Se mudar num mês, mude só aquele mês depois.')+
   '<div class="two">'+fNum('xDia','Dia que vence',f?f.dia:'','ex.: 10')+fSel('xCat','Categoria',cats().map(function(c){return [c,c]}),f?f.cat:'Contas da casa')+'</div>'+fSel('xMeio','Como paga',meios,f?(ehCartao(f.meio)?f.meio:'conta'):'conta','No cartão: entra dentro da fatura e não soma de novo.')+
+  fTxt('xGrupo','É com alguém? (opcional)',f?f.grupo:(grupo||''),'Ex.: Mãe','Junta as contas com a mesma pessoa num cartão com o total — cada uma continua separada.')+
+  '<div class="two">'+fMes('xIni','Começa em',f?f.inicio:'')+fMes('xFim','Última vez em',f?f.fim:'')+'</div><small class="sub" style="display:block;margin:6px 2px 0">“Última vez” vazio = não tem data para acabar. Começa vazio = '+(f?'como está':'este mês (ou o próximo, se o dia já passou)')+'.</small>'+
   '<button class="btn" onclick="salvarFixa('+(f?"'"+f.id+"'":'null')+')">Salvar</button>'+(f&&!f.fim?'<button class="btn sec" onclick="fixaCancelou(\''+f.id+'\')">Cancelei: não vem mais</button>':'')+(f?'<button class="btn red" onclick="if(confirm(\'Apagar esta conta fixa?\')){apaga(\'fixas\',\''+f.id+'\');fechar();render()}">Apagar</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
 function salvarFixa(id){var n=val('xNome').trim();if(!n){toast('Dê um nome');return}var v=dinheiro('xVal');if(v==null)return;var d=+val('xDia')||0;if(!d||d>31){toast('Diga o dia que vence');return}
- var p={nome:n,valor:v,dia:d,cat:val('xCat'),meio:val('xMeio')};if(id)muda('fixas',id,p);else{p.inicio=d<+hoje().slice(8,10)&&!ehCartao(p.meio)?addM(ymOf(hoje()),1):ymOf(hoje());put('fixas',p)}fechar();render();toast('Conta fixa salva')}
+ var p={nome:n,valor:v,dia:d,cat:val('xCat'),meio:val('xMeio'),grupo:String(val('xGrupo')||'').replace(/\s+/g,' ').trim().slice(0,30)},ini=val('xIni'),fim=val('xFim');
+ if(p.grupo)p.grupo=p.grupo.charAt(0).toUpperCase()+p.grupo.slice(1);
+ if(/^\d{4}-\d{2}$/.test(ini))p.inicio=ini;if(/^\d{4}-\d{2}$/.test(fim))p.fim=fim;else p.fim=null;
+ if(p.inicio&&p.fim&&p.fim<p.inicio){toast('A última vez é antes do começo');return}
+ if(id)muda('fixas',id,p);else{if(!p.inicio)p.inicio=d<+hoje().slice(8,10)&&!ehCartao(p.meio)?addM(ymOf(hoje()),1):ymOf(hoje());put('fixas',p)}fechar();render();toast('Conta fixa salva')}
 function fixaCancelou(id){var f=reg('fixas',id),ym=ymOf(hoje()),pago=itemFixa(f,ym).rec>0;muda('fixas',id,{fim:pago?ym:addM(ym,-1)});fechar();render();toast(f.nome+': não vem mais')}
 
 /* ---------- a folha de cada item (receber ou pagar) ---------- */
@@ -515,20 +529,20 @@ function lancar(tipo){if(!contas().length){toast('Primeiro cadastre seu banco');
 function abrirLanc(id){var l=reg('lanc',id);if(!l)return;
  if(l.ref){var p=l.ref.split('|');if(p[0]==='cli')return abrirItem('cli',p[1],p[2]);if(p[0]==='rec')return abrirItem('rec',p[1]);if(p[0]==='fixa')return abrirItem('fixa',p[1],p[2])}
  if(l.tipo==='pagfatura'){var q=l.ref.split('|');return abrirFatura(q[0],q[1])}
- NL={id:l.id,tipo:l.tipo==='entrada'?'recebi':l.tipo,valor:l.valor,desc:l.desc,cat:l.cat,catManual:1,meio:l.meio,dest:l.dest,parc:l.parc||1,data:l.data};formLanc()}
+ NL={id:l.id,tipo:l.tipo==='entrada'?'recebi':l.tipo,valor:l.valor,desc:l.desc,cat:l.cat,catManual:1,meio:l.meio,dest:l.dest,parc:l.parc||1,data:l.data,fat1:l.fat1,vParc:l.vParc,aprox:l.dataAprox,orig:{valor:l.valor,meio:l.meio,parc:l.parc||1,data:l.data}};formLanc()}
 function lerNL(){if(!NL)return;var v=parseBRL(val('lVal'));if(v!=null)NL.valor=v;['lDesc','lData','lQuem'].forEach(function(i){var e=document.getElementById(i);if(e)NL[{lDesc:'desc',lData:'data',lQuem:'quem'}[i]]=e.value});var p=document.getElementById('lParc');if(p)NL.parc=+p.value||1}
 function nlSet(k,v){lerNL();NL[k]=v;if(k==='cat')NL.catManual=1;formLanc()}
 function formLanc(){var e=!!NL.id,t=NL.tipo,h='<h3>'+(e?'Editar':'Lançar')+'</h3>';
  if(!e)h+='<div class="seg" style="margin-top:10px">'+[['gasto','Gastei'],['recebi','Recebi'],['areceber','A receber']].map(function(o){return '<button class="'+(t===o[0]?'on':'')+'" onclick="nlSet(\'tipo\',\''+o[0]+'\')">'+o[1]+'</button>'}).join('')+'</div>';
  if(t==='gasto'){
   h+=fTxt('lDesc','O que foi',NL.desc,'Ex.: mercado, unha, Uber').replace('autocomplete="off">','autocomplete="off" oninput="nlSug(this.value)">');
-  h+=fMoney('lVal','Valor',NL.valor);
+  h+=fMoney('lVal',(NL.parc||1)>1?'Valor total da compra':'Valor',NL.valor,(NL.parc||1)>1&&NL.vParc!=null&&NL.valor===NL.orig.valor?NL.parc+'x de '+c2s(NL.vParc)+' (como veio da fatura)':'');
   var cs=cats(),top=['Mercado','Alimentação','iFood e delivery','Beleza','Roupas e acessórios','Uber e 99','Farmácia','Lazer'];if(NL.cat&&top.indexOf(NL.cat)<0)top.unshift(NL.cat);
   h+='<div class="f"><label>Categoria</label><div class="chips" id="lCats">'+(NL.todas?cs:top).map(function(c){return '<button class="'+(NL.cat===c?'on':'')+'" onclick="nlSet(\'cat\',\''+c.replace(/'/g,"\\'")+'\')">'+icCat(c)+' '+esc(c)+'</button>'}).join('')+(NL.todas?'':'<button onclick="nlSet(\'todas\',1)">mais…</button>')+'</div></div>';
   h+='<div class="f"><label>Como pagou</label><div class="chips">'+contas().map(function(c){return '<button class="'+(NL.meio===c.id?'on':'')+'" onclick="nlSet(\'meio\',\''+c.id+'\')">Pix · '+esc(c.nome)+'</button>'}).concat(cartoes().map(function(c){return '<button class="'+(NL.meio===c.id?'on':'')+'" onclick="nlSet(\'meio\',\''+c.id+'\')">💳 '+esc(c.nome)+'</button>'})).join('')+'</div></div>';
-  if(ehCartao(NL.meio)){var k=reg('cartoes',NL.meio),fm=faturaDe(k,NL.data||hoje());
-   h+='<div class="two">'+fSel('lParc','Parcelas',[1,2,3,4,5,6,7,8,9,10,11,12].map(function(n){return [n,n===1?'À vista':n+'x']}),NL.parc||1)+'<div class="f"><label>Cai na fatura</label><div style="padding:13px 2px;font-weight:800;text-transform:capitalize">'+mesNome(fm)+'</div></div></div>'}
-  h+=fData('lData','Data',NL.data)}
+  if(ehCartao(NL.meio)){var k=reg('cartoes',NL.meio),fixo=NL.fat1&&NL.orig&&NL.meio===NL.orig.meio,fm=fixo?NL.fat1:faturaDe(k,NL.data||hoje()),np=[];for(var q=1;q<=Math.max(12,NL.parc||1);q++)np.push(q);
+   h+='<div class="two">'+fSel('lParc','Parcelas',np.map(function(n){return [n,n===1?'À vista':n+'x']}),NL.parc||1)+'<div class="f"><label>'+((NL.parc||1)>1?'1ª parcela na fatura':'Cai na fatura')+'</label><div style="padding:13px 2px;font-weight:800;text-transform:capitalize">'+mesNome(fm)+'</div></div></div>'}
+  h+=fData('lData',NL.aprox?'Data da compra (aproximada)':'Data',NL.data)}
  else if(t==='recebi'){
   var pend=[],lim=addD(hoje(),20);[addM(ymOf(hoje()),-3),addM(ymOf(hoje()),-2),addM(ymOf(hoje()),-1),ymOf(hoje()),addM(ymOf(hoje()),1)].forEach(function(ym){if(ym<inicio())return;itensMes(ym).forEach(function(x){if(x.sinal>0&&x.resta>0&&x.data<=lim)pend.push(x)})});
   pend.sort(function(a,b){return a.data<b.data?-1:1});
@@ -549,6 +563,7 @@ function nlDe(k,resta){lerNL();NL.de=k;if(resta!=null)NL.valor=resta;formLanc()}
 function salvarLanc(){lerNL();var t=NL.tipo,v=parseBRL(val('lVal'));if(v==null||v<=0){toast('Digite o valor');return}var d=NL.data||hoje(),l;
  if(t==='gasto'){var desc=(NL.desc||'').trim(),cat=NL.cat||sugCat(desc)||'Outros';if(!NL.meio){toast('Escolha como pagou');return}
   var p={tipo:'gasto',valor:v,data:d,desc:desc||cat,cat:cat,meio:NL.meio,parc:ehCartao(NL.meio)?(+NL.parc||1):1};
+  if(NL.id){if(cat!=='A classificar')p.rever=0;var o=NL.orig||{};if(NL.fat1&&p.meio!==o.meio)p.fat1=null;if(NL.vParc!=null&&(v!==o.valor||p.parc!==o.parc))p.vParc=null;if(NL.aprox&&d!==o.data)p.dataAprox=0}
   l=NL.id?muda('lanc',NL.id,p):put('lanc',p);if(!ehCartao(NL.meio))lembraConta(NL.meio);fechar();render();toast(NL.id?'Salvo':(desc||cat)+': '+c2s(v)+' lançado',NL.id?null:[['lanc',l.id]]);return}
  if(t==='recebi'){if(!NL.meio){toast('Escolha onde caiu');return}
   if(NL.de){var q=NL.de.split('|'),x=achaItem(q[0],q[1],q[2]);l=put('lanc',{tipo:'entrada',ref:x.ref,valor:v,meio:NL.meio,data:d,desc:x.titulo})}
@@ -586,6 +601,136 @@ function mescla(r){var sobe=[];COLS.forEach(function(c){var rm=r[c]||{},lc=S[c];
  salvaLocal();sobe.forEach(function(p){nuvemPut(p[0],p[1])})}
 function chaveFb(id){return String(id).replace(/[.#$\[\]\/]/g,'_')}
 function nuvemPut(col,o){if(!NV.ref||!o||!o.id)return;try{NV.ref.child(col+'/'+chaveFb(o.id)).set(JSON.parse(JSON.stringify(o))).catch(function(){NV.estado='erro';NV.erro='Um lançamento não subiu para a nuvem; tento de novo ao abrir.';render()})}catch(e){}}
+
+/* ---------- classificar as compras que vieram das faturas ---------- */
+function precisaClassificar(l){return l&&l.tipo==='gasto'&&(l.cat==='A classificar'||!!l.rever)}
+function nrm(s){return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+var CLF={cid:'',ym:''};
+function listaClassificar(){var ids=null;if(CLF.cid&&CLF.ym)ids=itensFatura(CLF.cid,CLF.ym).filter(function(i){return i.kind==='lanc'}).map(function(i){return i.l.id});
+ return lista('lanc').filter(function(l){return precisaClassificar(l)&&(!CLF.cid||l.meio===CLF.cid)&&(!ids||ids.indexOf(l.id)>=0)}).sort(function(a,b){return a.data!==b.data?(a.data<b.data?1:-1):(String(a.desc)<String(b.desc)?-1:1)})}
+function subCompra(l){var n=Math.max(1,+l.parc||1);return esc(nomeMeio(l.meio))+' · '+(l.dataAprox?'comprou ~'+mesSo(ymOf(l.data)):dcurto(l.data))+(n>1?' · '+n+'x de '+c2s(l.vParc!=null?l.vParc:parcV(l.valor,n,0)):'')}
+function abrirClassificar(cid,ym){CLF={cid:cid||'',ym:ym||''};var ls=listaClassificar(),k=CLF.cid?reg('cartoes',CLF.cid):null;
+ var h='<h3>🏷️ Classificar compras</h3><div class="sub">'+(k?'Fatura '+esc(k.nome)+(CLF.ym?' · '+mesNome(CLF.ym):''):'Todas as compras que vieram das faturas')+'</div>';
+ if(!ls.length)h+='<div class="card" style="margin-top:12px;text-align:center"><b class="pos">Tudo classificado ✓</b></div>';
+ else h+='<div class="sub" style="margin-top:8px">Toque numa compra e escolha a categoria. Com <b>?</b> já vem um palpite — é só confirmar.</div><div class="card" style="margin-top:10px">'+ls.map(function(l){var pal=l.cat!=='A classificar';
+  return '<div class="row tap" onclick="classificaUm(\''+l.id+'\')"><div class="bub out">'+icCat(l.cat)+'</div><div class="g"><div class="t">'+esc(l.desc)+'</div><div class="s">'+subCompra(l)+' · <span class="pill lav">'+(pal?esc(l.cat)+'?':'a classificar')+'</span></div></div><div class="v">'+c2s(l.valor)+'</div></div>'}).join('')+'</div>';
+ abrir(h+(k&&CLF.ym?'<button class="btn sec" onclick="abrirFatura(\''+CLF.cid+'\',\''+CLF.ym+'\')">Voltar para a fatura</button>':'')+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
+var MARCAS=['uber','99','amazon','ifood','apple','sephora','tiktok','shopee','shein','netflix','spotify','kiwify','canva','google','mercadolivre','rappi'];
+function chaveNome(t){var n=nrm(t).replace(/\b(parcela|pending|nupay|trip|help|bra|br)\b/g,' ').replace(/\d+/g,' ').replace(/\s+/g,' ').trim(),w=n.split(' ')[0];return MARCAS.indexOf(w)>=0?w:n}
+function parecidas(l){var k=chaveNome(l.desc);return listaClassificar().filter(function(x){return x.id!==l.id&&chaveNome(x.desc)===k})}
+function classificaUm(id){var l=reg('lanc',id);if(!l)return abrirClassificar(CLF.cid,CLF.ym);var pc=parecidas(l),sug=l.cat!=='A classificar'?l.cat:'',cs=cats();
+ var h='<h3>'+esc(l.desc)+'</h3><div class="sub">'+subCompra(l)+'</div><div class="card" style="margin-top:12px;text-align:center"><div class="sub">'+(+l.parc>1?'Valor total da compra':'Valor')+'</div><div class="big">'+c2s(l.valor)+'</div></div>';
+ if(pc.length)h+='<label style="display:flex;gap:10px;align-items:center;margin:4px 2px 12px;font-weight:700"><input type="checkbox" id="cTodas" checked style="width:22px;height:22px;accent-color:var(--rose)"> Usar a mesma categoria nas outras '+pc.length+' parecida'+(pc.length>1?'s':'')+'</label>';
+ if(sug)h+='<button class="btn" onclick="classifica(\''+id+'\','+cs.indexOf(sug)+')">✓ É '+icCat(sug)+' '+esc(sug)+'</button><div class="sub" style="text-align:center;margin:8px 0 4px">ou escolha outra:</div>';
+ h+='<div class="chips" style="margin:8px 0 6px">'+cs.map(function(c,i){return '<button class="'+(c===sug?'on':'')+'" onclick="classifica(\''+id+'\','+i+')">'+icCat(c)+' '+esc(c)+'</button>'}).join('')+'</div>';
+ h+='<div class="f"><input id="cNova" placeholder="Outra categoria (ex.: Faculdade)" autocomplete="off"></div><button class="btn sm sec" onclick="classificaNova(\''+id+'\')">Criar e usar</button>';
+ h+='<button class="btn sec" onclick="abrirLanc(\''+id+'\')">Editar a compra (nome, valor, data, cartão)</button><button class="btn sec" onclick="abrirClassificar(CLF.cid,CLF.ym)">Voltar à lista</button>';
+ abrir(h)}
+function classificaNova(id){var n=String(val('cNova')||'').replace(/\s+/g,' ').trim().slice(0,30);if(!n){toast('Escreva o nome');return}n=n.charAt(0).toUpperCase()+n.slice(1);
+ var ex=cats().filter(function(c){return c.toLowerCase()===n.toLowerCase()})[0];if(!ex){put('cats',{nome:n});ex=n}classifica(id,cats().indexOf(ex))}
+function classifica(id,i){var cat=cats()[i],l=reg('lanc',id);if(!cat||!l)return;var ids=[id],cb=document.getElementById('cTodas');if(cb&&cb.checked)parecidas(l).forEach(function(x){ids.push(x.id)});
+ ids.forEach(function(x){muda('lanc',x,{cat:cat,rever:0})});render();toast(ids.length>1?ids.length+' compras em '+cat:esc(l.desc)+' → '+cat);
+ var prox=listaClassificar()[0];if(prox)classificaUm(prox.id);else abrirClassificar(CLF.cid,CLF.ym)}
+
+/* ---------- importar faturas (CSV do Nubank ou pacote .json) ----------
+   Cada compra entra no cartão com as parcelas nas faturas certas (a do banco), mesmo as de meses passados.
+   Nada mexe no saldo do banco: as faturas que já venceram ficam marcadas como pagas. */
+var IMP=null;
+function addMDia(d,n){return diaNoMes(addM(ymOf(d),n),+d.slice(8,10))}
+function csvLinhas(t){var out=[],row=[],f='',q=false;for(var i=0;i<t.length;i++){var ch=t[i];
+  if(q){if(ch==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}
+  else if(ch==='"')q=true;else if(ch===','||ch===';'){row.push(f);f=''}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';if(row.some(function(x){return x.trim()}))out.push(row);row=[]}else f+=ch}
+ row.push(f);if(row.some(function(x){return x.trim()}))out.push(row);return out}
+function normData(s){s=String(s||'').trim();var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(m)return (m[3].length===2?'20'+m[3]:m[3])+'-'+pad(+m[2])+'-'+pad(+m[1]);return ''}
+function impArquivo(inp){var f=inp.files&&inp.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){inp.value='';try{impTexto(String(rd.result),f.name)}catch(e){toast('Não consegui ler esse arquivo')}};rd.readAsText(f)}
+function impTexto(t,nome){t=t.replace(/^\uFEFF/,'');
+ if(/^\s*[\[{]/.test(t)){var j=JSON.parse(t);if(j&&j.dados&&j.dados.lanc){toast('Isso é uma cópia de segurança: use "Restaurar de um arquivo"');return}if(!j||j.tipo!=='namorada-faturas')throw 0;return impPrepara(j)}
+ var L=csvLinhas(t),hd=(L.shift()||[]).map(nrm),iD=hd.indexOf('date'),iT=hd.indexOf('title'),iA=hd.indexOf('amount');
+ if(iD<0){iD=hd.indexOf('data');iT=hd.findIndex(function(h){return /descri|titulo|estabelec|lancamento/.test(h)});iA=hd.findIndex(function(h){return /valor|amount/.test(h)})}
+ if(iD<0||iT<0||iA<0)throw 0;
+ var m=String(nome).match(/(\d{4})-(\d{2})-(\d{2})/),fat=m?m[1]+'-'+m[2]:'',vd=m?+m[3]:0,banco=/nubank|^nu[_ -]/i.test(nome)?'Nubank':(String(nome).replace(/\.[a-z0-9]+$/i,'').replace(/[_ -]*\d{4}-\d{2}-\d{2}.*$/,'').replace(/[_]+/g,' ').trim()||'Cartão');
+ var compras=[],pags=0,cred=0;
+ L.forEach(function(r){var d=normData(r[iD]),tt=String(r[iT]||'').replace(/\s+/g,' ').trim(),a=String(r[iA]||'').trim(),v=parseBRL(a);if(!d||!tt||v==null||v===0)return;
+  if(/^[-−]/.test(a)||/^pagamento|pagamento recebido/i.test(tt)){if(/pagamento/i.test(tt))pags+=v;else cred+=v;return}
+  var pm=tt.match(/\s*-\s*Parcela\s+(\d+)\s*\/\s*(\d+)\s*$/i)||tt.match(/\s+-\s+(\d{1,2})\s*\/\s*(\d{1,2})\s*$/),i=1,n=1;if(pm){i=+pm[1];n=+pm[2];tt=tt.slice(0,pm.index).trim()}
+  if(!(n>=1&&i>=1&&i<=n)){i=1;n=1}
+  compras.push({c:'csv',t:tt,d:d,v:v,i:i,n:n,fat:fat,aprox:i>1?1:0})});
+ if(!compras.length){toast('Não achei compras nesse arquivo');return}
+ impPrepara({tipo:'namorada-faturas',csv:1,cartoes:[{ref:'csv',nome:banco,vence:vd||0,fecha:vd?((vd-8+31)%31)+1:0}],compras:compras,pagos:pags,creditos:cred})}
+function impAlvo(g,csv){var cs=cartoes(),n=nrm(g.nome),ex=cs.filter(function(c){return nrm(c.nome)===n});if(ex.length===1&&!csv)return ex[0].id;
+ var w=n.split(' ')[0],cand=cs.filter(function(c){return (' '+nrm(c.nome)+' ').indexOf(' '+w+' ')>=0||nrm(c.nome).indexOf(w)===0});
+ if(!cand.length)return 'novo';if(csv)return cand.length===1?cand[0].id:'';
+ var pj=/\b(pj|juridica|empresa|cnpj|mei)\b/,c2=cand.filter(function(c){return pj.test(nrm(c.nome))===pj.test(n)});return c2.length===1?c2[0].id:c2.length?'':'novo'}
+function impPrepara(pk){var gs=(pk.cartoes||[]).map(function(c){return {ref:c.ref,nome:c.nome,fecha:+c.fecha||0,vence:+c.vence||0,obs:c.obs||'',itens:[],alvo:''}});
+ (pk.compras||[]).forEach(function(x){var g=gs.filter(function(g){return g.ref===x.c})[0];if(!g)return;var n=Math.max(1,+x.n||1),i=Math.min(n,Math.max(1,+x.i||1));
+  g.itens.push({desc:String(x.t||'Compra').trim(),dPost:x.d,data:x.aprox?addMDia(x.d,-(i-1)):x.d,aprox:!!x.aprox,vParc:Math.round(+x.v),i:i,n:n,fat:x.fat||'',ok:true})});
+ gs=gs.filter(function(g){return g.itens.length||(pk.faturas||[]).some(function(f){return f.c===g.ref})});
+ gs.forEach(function(g){g.alvo=impAlvo(g,pk.csv)});
+ IMP={pk:pk,grupos:gs,quitar:true};impCalc();impTela()}
+function impFat(g,it){var c=g.alvo&&g.alvo!=='novo'?reg('cartoes',g.alvo):{fecha:g.fecha,vence:g.vence||1};return it.fat||faturaDe(c,it.dPost)}
+function impChave(it,fat1){return nrm(it.desc).replace(/ /g,'').slice(0,14)+'|'+fat1+'|'+it.vParc+'|'+it.n}
+function impCalc(){IMP.grupos.forEach(function(g){var usados={},cid=g.alvo&&g.alvo!=='novo'?g.alvo:'',c=cid?reg('cartoes',cid):null,ls=cid?lista('lanc').filter(function(l){return l.tipo==='gasto'&&l.meio===cid}):[];
+ g.itens.forEach(function(it){var fi=impFat(g,it);it.fat1=addM(fi,-(it.i-1));it.k=impChave(it,it.fat1);it.ja=ls.some(function(l){return l.impK===it.k});it.dup=null;
+  if(it.ja||!c)return;var d=ls.filter(function(l){if(l.impK||usados[l.id])return false;var vv=Math.abs(l.valor-it.vParc)<=1||Math.abs(l.valor-it.vParc*it.n)<=1;if(!vv)return false;return faturaDe(c,l.data)===fi||Math.abs(diffD(l.data,it.dPost))<=7||Math.abs(diffD(l.data,it.data))<=7})[0];
+  it.troca=!!(d&&it.n>1&&Math.abs(d.valor-it.vParc)<=1&&(+d.parc||1)===1);
+  if(d){usados[d.id]=1;it.dup=d;if(it.okManual==null)it.ok=it.troca}else if(it.okManual==null)it.ok=true})})}
+function impTela(){var h='<h3>📥 Importar faturas</h3>',pk=IMP.pk,tot=0;
+ IMP.grupos.forEach(function(g,gi){var cs=cartoes(),opts=(g.alvo===''?[['','Escolha o cartão…']]:[]).concat(cs.map(function(c){return [c.id,c.nome]}),[['novo','Criar cartão novo: '+g.nome]]);
+  var novos=g.itens.filter(function(it){return it.ok&&!it.ja}),ja=g.itens.filter(function(it){return it.ja}).length,dups=g.itens.filter(function(it){return it.dup&&!it.ja&&!it.troca}).length,trocas=g.itens.filter(function(it){return it.troca&&it.ok&&!it.ja}).length;tot+=novos.length;
+  h+='<div class="card" style="margin-top:12px"><h2>💳 '+esc(g.nome)+'</h2>'+(g.obs?'<div class="sub" style="margin:-4px 0 6px">'+esc(g.obs)+'</div>':'')+fSel('impA'+gi,'Para qual cartão do app',opts,g.alvo).replace('<select ','<select onchange="impMuda('+gi+',this.value)" ');
+  if(g.alvo==='novo')h+='<div class="sub" style="margin-top:6px">Vai criar o cartão <b>'+esc(g.nome)+'</b>'+(g.vence?' · vence dia '+g.vence+(g.fecha?' · fecha dia '+g.fecha:''):'')+'. Confira depois em Cartões.</div>';
+  if(!g.alvo){h+='<div class="sub neg" style="margin-top:6px">Escolha o cartão para continuar.</div></div>';return}
+  h+='<div class="sub" style="margin-top:8px"><b>'+novos.length+'</b> compra'+(novos.length!==1?'s':'')+' para entrar'+(ja?' · '+ja+' já importada'+(ja>1?'s':'')+' (pulo)':'')+(dups?' · <b>'+dups+'</b> parece'+(dups>1?'m':'')+' que você já lançou (desmarcada'+(dups>1?'s':'')+')':'')+(trocas?' · '+trocas+' parcela'+(trocas>1?'s':'')+' que você lançou à mão vira'+(trocas>1?'m':'')+' a compra parcelada completa':'')+'</div>';
+  var fats={};g.itens.forEach(function(it){if(!it.ok||it.ja)return;for(var q=it.i;q<=it.n;q++){var y=addM(it.fat1,q-1);fats[y]=(fats[y]||0)+it.vParc}});var ys=Object.keys(fats).sort().slice(0,3);
+  if(ys.length)h+='<div class="sub" style="margin-top:4px">'+ys.map(function(y){return cap(mesSo(y))+': '+c2s(fats[y])}).join(' · ')+'</div>';
+  h+='<details style="margin-top:8px"><summary class="sub tap" style="font-weight:800;color:var(--rose)">Ver as '+g.itens.length+' compras</summary>'+g.itens.map(function(it,ii){return '<label class="row" style="gap:10px'+(it.ja?';opacity:.45':'')+'"><input type="checkbox" '+(it.ok&&!it.ja?'checked ':'')+(it.ja?'disabled ':'')+'onchange="impCk('+gi+','+ii+',this.checked)" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><div class="g"><div class="t">'+esc(it.desc)+(it.n>1?' <span class="pill">'+it.i+'/'+it.n+'</span>':'')+'</div><div class="s">'+(it.aprox?'comprou ~'+mesSo(ymOf(it.data)):dcurto(it.data))+' · fatura de '+mesSo(addM(it.fat1,it.i-1))+(it.ja?' · já importada':'')+(it.dup?(it.troca&&it.ok?' · <span class="lav">troca a sua “'+esc(it.dup.desc)+'” '+c2s(it.dup.valor)+' por esta, com todas as parcelas</span>':' · <span class="neg">você já lançou “'+esc(it.dup.desc)+'” '+c2s(it.dup.valor)+'</span>'):'')+'</div></div><div class="v">'+c2s(it.vParc)+'</div></label>'}).join('')+'</details></div>'});
+ h+='<label style="display:flex;gap:10px;align-items:flex-start;margin:14px 2px;font-weight:700"><input type="checkbox" '+(IMP.quitar?'checked ':'')+'onchange="IMP.quitar=this.checked" style="width:22px;height:22px;accent-color:var(--rose);flex:none"><span>As faturas que já venceram já estão pagas<br><span class="sub" style="font-weight:600">Ficam marcadas como pagas, sem mexer no saldo.</span></span></label>';
+ h+='<div class="sub" style="margin-bottom:6px">As compras entram com um palpite de categoria e ficam na lista “para classificar”. Dá para editar ou apagar qualquer uma depois.</div>';
+ var ok=IMP.grupos.every(function(g){return g.alvo})&&tot>0;
+ var sh=document.getElementById('sheet'),st=document.getElementById('ov').classList.contains('open')?sh.scrollTop:0;
+ abrir(h+'<button class="btn" '+(ok?'':'disabled style="opacity:.5" ')+'onclick="impOk()">Importar '+tot+' compra'+(tot!==1?'s':'')+'</button><button class="btn sec" onclick="IMP=null;fechar()">Cancelar</button>');sh.scrollTop=st}
+function impMuda(gi,v){IMP.grupos[gi].alvo=v;IMP.grupos[gi].itens.forEach(function(it){it.okManual=null});impCalc();impTela()}
+function impCk(gi,ii,on){var it=IMP.grupos[gi].itens[ii];it.ok=on;it.okManual=on;var ds=document.querySelectorAll('#sheet details'),ab=[].map.call(ds,function(d){return d.open});impTela();[].forEach.call(document.querySelectorAll('#sheet details'),function(d,i){d.open=!!ab[i]})}
+function impOk(){if(!IMP)return;if(IMP.grupos.some(function(g){return !g.alvo})){toast('Escolha o cartão de cada fatura');return}
+ var lote='imp'+uid(),undo=[],n=0,tocou={},nomes=[];
+ IMP.grupos.forEach(function(g){var cid=g.alvo;
+  if(cid==='novo'){var k=put('cartoes',{nome:g.nome,fecha:g.fecha||0,vence:g.vence||5,limite:0,cor:cartoes().length%CORES.length});cid=k.id;g.alvo=cid;undo.push(['cartoes',cid])}
+  var c=reg('cartoes',cid),m=0;nomes.push(c.nome);
+  g.itens.forEach(function(it){if(!it.ok||it.ja)return;var fi=it.fat||faturaDe(c,it.dPost),f1=addM(fi,-(it.i-1));
+   var cat0=sugCat(it.desc)||'A classificar',rev=1,tr=null;if(it.troca&&it.dup&&reg('lanc',it.dup.id)){tr=it.dup.id;if(it.dup.cat&&it.dup.cat!=='Outros'){cat0=it.dup.cat;rev=0}apaga('lanc',tr);undo.push(['lanc',tr,'volta'])}
+   var l=put('lanc',{tipo:'gasto',desc:it.desc,cat:cat0,rever:rev,valor:it.vParc*it.n,parc:it.n,vParc:it.n>1?it.vParc:null,fat1:f1,data:it.data,dataAprox:it.aprox?1:0,meio:cid,imp:lote,impK:impChave(it,f1),trocou:tr});
+   undo.push(['lanc',l.id]);n++;m++;if(!tocou[cid]||f1<tocou[cid])tocou[cid]=f1});
+  (IMP.pk.faturas||[]).forEach(function(f){if(f.c!==g.ref||!f.ym)return;var k=cid+'|'+f.ym,ex=S.faturas[k]&&!S.faturas[k].del,p={del:false};if(f.banco!=null)p.banco=Math.round(+f.banco);if(f.quitada)p.quitada=1;muda('faturas',k,p);if(!ex)undo.push(['faturas',k]);if(!tocou[cid])tocou[cid]=f.ym})});
+ if(IMP.quitar)Object.keys(tocou).forEach(function(cid){var c=reg('cartoes',cid);for(var ym=tocou[cid],z=0;z<60;z++,ym=addM(ym,1)){if(diaNoMes(ym,+c.vence||1)>=hoje())break;var k=cid+'|'+ym,x=fatura(cid,ym);if(x.resta>0){var ex=S.faturas[k]&&!S.faturas[k].del;muda('faturas',k,{quitada:1,del:false});if(!ex)undo.push(['faturas',k])}}});
+ if(n)muda('cfg','geral',{imps:(cfg().imps||[]).concat([{id:lote,em:hoje(),n:n,onde:nomes.join(', ')}]).slice(-20)});
+ IMP=null;fechar();render();toast(n+' compra'+(n!==1?'s':'')+' importada'+(n!==1?'s':'')+' 💖',undo)}
+function impDesfazer(lote){var ls=lista('lanc').filter(function(l){return l.imp===lote});if(!confirm('Apagar as '+ls.length+' compras desta importação? (as que você já editou também)'))return;
+ ls.forEach(function(l){apaga('lanc',l.id);if(l.trocou&&S.lanc[l.trocou])muda('lanc',l.trocou,{del:false})});muda('cfg','geral',{imps:(cfg().imps||[]).filter(function(x){return x.id!==lote})});render();toast('Importação desfeita')}
+function cardImportar(){var im=(cfg().imps||[]).filter(function(x){return lista('lanc').some(function(l){return l.imp===x.id})});
+ return '<div class="card"><h2>📥 Importar faturas</h2><div class="sub">O arquivo do Nubank (.csv) ou o pacote que o Hudson mandar (.json). Cada compra entra no cartão com as parcelas nos meses certos — depois é só classificar.</div><button class="btn sm" onclick="document.getElementById(\'arqImp\').click()">Escolher arquivo</button>'+
+  (im.length?'<div class="hr"></div>'+im.map(function(x){var q=lista('lanc').filter(function(l){return l.imp===x.id}).length;return '<div class="kv"><span>'+dbr(x.em)+' · '+esc(x.onde)+' · '+q+' compras</span><a class="sub tap" style="color:var(--coral);font-weight:800" onclick="impDesfazer(\''+x.id+'\')">desfazer</a></div>'}).join(''):'')+'</div>'}
+function cardClassificar(){var n=lista('lanc').filter(precisaClassificar).length;if(!n)return '';
+ return '<div class="card tap" onclick="abrirClassificar()" style="background:var(--lav2);box-shadow:none"><div class="kv" style="padding:0"><b class="lav">🏷️ '+n+' compra'+(n>1?'s':'')+' para classificar</b><span class="lav" style="font-size:20px">›</span></div><div class="sub" style="margin-top:3px">Vieram das faturas. Toque e escolha a categoria de cada uma.</div></div>'}
+
+/* ---------- contas com alguém (ex.: o que deve para a mãe): cada item separado, com o total ---------- */
+function gruposFixas(){var g={};lista('fixas').forEach(function(f){var n=String(f.grupo||'').trim();if(n)(g[n]=g[n]||[]).push(f)});return g}
+function resumoGrupo(nome){var fs=(gruposFixas()[nome]||[]).sort(function(a,b){return (a.dia||0)-(b.dia||0)}),ym=ymOf(hoje()),r={fs:fs,mes:0,pagoMes:0,falta:0,semFim:0,fim:'',meses:{}};
+ fs.forEach(function(f){if(f.fim&&f.fim>r.fim)r.fim=f.fim;if(!f.fim)r.semFim++;
+  var ate=f.fim||addM(ym,11);for(var m=ym,z=0;m<=ate&&z<120;m=addM(m,1),z++){if(!fixaVigente(f,m))continue;var x=itemFixa(f,m);if(x.apagada&&!x.rec)continue;
+   if(m===ym){r.mes+=x.valor;r.pagoMes+=x.rec}if(f.fim)r.falta+=x.resta;r.meses[m]=(r.meses[m]||0)+x.resta}});return r}
+function tituloGrupo(n){return /^m[ãa]e$/i.test(n)?'Com a mãe':'Com '+n}
+function cardsGrupos(){return Object.keys(gruposFixas()).sort().map(function(n){var r=resumoGrupo(n),rm=r.mes-r.pagoMes;
+ return '<div class="card tap" onclick="abrirGrupo(\''+esc(n).replace(/'/g,"\\'")+'\')"><div class="kv" style="padding:0"><h2 style="margin:0">🤍 '+esc(tituloGrupo(n))+'</h2><span class="mut" style="font-size:20px">›</span></div>'+
+  '<div class="kv"><span>Este mês ('+mesSo(ymOf(hoje()))+')</span><b>'+c2s(r.mes)+'</b></div>'+(r.pagoMes?'<div class="kv"><span>Já pagou</span><b class="pos">'+c2s(r.pagoMes)+'</b></div><div class="kv"><span>Falta este mês</span><b class="'+(rm>0?'neg':'pos')+'">'+c2s(rm)+'</b></div>':'')+
+  (r.falta?'<div class="kv"><span>Falta até terminar'+(r.fim?' ('+mesSo(r.fim).slice(0,3)+'/'+r.fim.slice(2,4)+')':'')+'</span><b>'+c2s(r.falta)+'</b></div>':'')+'<div class="sub">'+r.fs.length+' ite'+(r.fs.length>1?'ns':'m')+' separado'+(r.fs.length>1?'s':'')+(r.semFim?' · '+r.semFim+' sem data para acabar':'')+'</div></div>'}).join('')}
+function abrirGrupo(n){var r=resumoGrupo(n),ym=ymOf(hoje());
+ var h='<h3>🤍 '+esc(tituloGrupo(n))+'</h3><div class="sub">Cada conta separada. Toque numa para pagar, mudar a data ou o valor do mês.</div>';
+ h+='<div class="card" style="margin-top:12px"><div class="tri"><div><span>Este mês</span><b>'+c2s(r.mes)+'</b></div><div><span>Pago</span><b class="pos">'+c2s(r.pagoMes)+'</b></div><div><span>Falta</span><b class="'+(r.mes-r.pagoMes>0?'neg':'pos')+'">'+c2s(r.mes-r.pagoMes)+'</b></div></div></div>';
+ h+='<div class="card"><h2>'+cap(mesNome(ym))+'</h2>'+r.fs.map(function(f){if(!fixaVigente(f,ym))return '<div class="row tap" onclick="abrirFixa(\''+f.id+'\')"><div class="bub lav">🤍</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">'+(f.inicio>ym?'começa em '+mesNome(f.inicio):'terminou em '+mesNome(f.fim))+'</div></div><div class="v">'+c2s(f.valor)+'</div></div>';
+  var x=itemFixa(f,ym),rest=0;if(f.fim)for(var m=addM(ym,1);m<=f.fim;m=addM(m,1))if(fixaVigente(f,m))rest++;x.tag=f.fim?(rest?'depois deste, mais '+rest+(rest>1?' meses':' mês')+' · até '+mesSo(f.fim)+'/'+f.fim.slice(2,4):'último mês'):'sem data para acabar';return linhaItem(x,true)}).join('')+'</div>';
+ var ms=Object.keys(r.meses).sort().filter(function(m){return m>ym&&r.meses[m]>0}).slice(0,12);
+ if(ms.length)h+='<div class="card"><h2>Próximos meses</h2>'+ms.map(function(m){return '<div class="kv"><span style="text-transform:capitalize">'+mesNome(m)+'</span><b>'+c2s(r.meses[m])+'</b></div>'}).join('')+(r.falta?'<div class="hr"></div><div class="kv"><span><b>Falta no total</b></span><b>'+c2s(r.falta)+'</b></div>':'')+'</div>';
+ abrir(h+'<button class="btn sec" onclick="abrirFixa(null,\''+esc(n).replace(/'/g,"\\'")+'\')">+ Outra conta '+esc(tituloGrupo(n).toLowerCase())+'</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
 
 /* ---------- cópia de segurança ---------- */
 function exportar(){var j=JSON.stringify({app:'namorada',v:APP_VER,em:new Date().toISOString(),dados:S}),nome='namorada-'+hoje()+'.json';
