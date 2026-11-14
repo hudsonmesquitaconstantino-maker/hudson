@@ -178,7 +178,7 @@ header .gear{border:0;background:var(--chip);color:var(--tx2);width:34px;height:
 .card.cn{padding:4px 14px;margin:0}
 .rn{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:.5px solid var(--line)}.cn>.rn:first-child,.dh+.rn{border-top:0}
 .rn .g{flex:1;min-width:0}.rn .t{font-size:16px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rn .s{font-size:13px;color:var(--tx2);margin-top:1px}.rn .s:empty{display:none}
-.rn .v{font-size:16px;font-weight:680;white-space:nowrap}.rn .v.pago{color:var(--tx3);font-weight:550}
+.rn .v{font-size:16px;font-weight:680;white-space:nowrap;text-align:right}.rn .v small{display:block;font-size:12.5px;font-weight:600;color:var(--tx2);margin-top:1px}.rn .v.pago{color:var(--tx3);font-weight:550}
 .mais{text-align:center;padding:10px 0;color:var(--acc);font-weight:650;font-size:14.5px;border-top:.5px solid var(--line)}
 .hero2{border-radius:24px;padding:18px 18px 16px;margin:8px 0 12px;background:linear-gradient(145deg,#0F5844,#1C8564 70%,#2A9A74);color:#fff}
 @media (prefers-color-scheme:dark){.hero2{background:linear-gradient(145deg,#0D3F31,#145E48 70%,#1B7258)}}
@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=61, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=62, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1846,7 +1846,7 @@ function capM(ym){var n=mesNome(ym).split(' ')[0];return n.charAt(0).toUpperCase
 /* uma linha: círculo (pagar/receber num toque) · nome · data · valor */
 function rowN(x,o){o=o||{};var t=hoje(),d=o.data||x.dataOrig||x.data,atr=o.atr!=null?o.atr:(d<t&&x.resta>0),v=o.v!=null?o.v:(x.resta>0?x.resta:x.valor);
  var sub=o.sub!=null?o.sub:(atr?'<span class="neg">'+(x.sinal>0?'atrasado · ':'venceu ')+dcurto(d)+'</span>':(d===t?'hoje':dcurto(d)));
- return '<div class="rn tap" onclick="'+(o.on||acaoItem(x))+'">'+(o.ck!=null?o.ck:ckHtml(x))+'<div class="g"><div class="t">'+esc(o.tit||x.titulo)+'</div><div class="s">'+sub+'</div></div><div class="v'+(x.sinal>0?' pos':'')+(x.status==='pago'?' pago':'')+'">'+c2s(v)+'</div></div>'}
+ return '<div class="rn tap" onclick="'+(o.on||acaoItem(x))+'">'+(o.ck!=null?o.ck:ckHtml(x))+'<div class="g"><div class="t">'+esc(o.tit||x.titulo)+'</div><div class="s">'+sub+'</div></div><div class="v'+(x.sinal>0?' pos':'')+(x.status==='pago'?' pago':'')+'">'+c2s(v)+(x.kind==='fatura'&&x.pai>0&&x.valor>0?'<small>fatura '+c2s(x.valor)+'</small>':'')+'</div></div>'}
 function secN(tit,body,link){return '<div class="sec"><div class="sech"><span>'+tit+'</span>'+(link||'')+'</div><div class="card cn">'+body+'</div></div>'}
 
 /* ---------- HOJE ---------- */
@@ -1902,7 +1902,7 @@ function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
  ord.forEach(function(d){var sd=d!=='zz'&&d>=t&&p.saldo!=null&&p.dias[d]?p.dias[d].saldo:null;
   h+='<div class="gday'+(d===t?' hoje':'')+'"><b>'+(d==='zz'?'Sem data':esc(diaLongo(d)))+'</b><span'+(sd!=null&&sd<0?' class="neg"':'')+'>'+(sd!=null?'saldo '+c2s(sd):'')+'</span></div><div class="card cn">';
   dias[d].forEach(function(x){var fp=x.kind==='fatura'&&x.pai>0,st=x.status==='pago'?(x.sinal>0?'recebido':'pago'):(x.data<t&&x.resta>0?'<span class="neg">'+(x.sinal>0?'atrasado':'em aberto')+'</span>':(x.cert==='incerta'?'incerto':''));
-   if(fp)st=(st?st+' · ':'')+'sua parte · fatura '+c2s(x.valor)+' (seu pai '+c2s(x.pai)+')';
+   if(fp)st=(st?st+' · ':'')+'sua parte · seu pai '+c2s(x.pai);
    h+=rowN(x,{sub:st,v:fp?(x.status==='pago'||!(suaR(x)>0)?suaV(x):suaR(x)):(x.status==='pago'?x.valor:(x.resta>0?x.resta:x.valor))})});
   h+='</div>'});
  return h}
