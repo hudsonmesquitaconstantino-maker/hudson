@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=60, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=61, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1893,7 +1893,7 @@ function receberHoje(){var t=hoje(),lim=addD(t,7),out=[],porCarro={};
 function segAg(){return '<div class="seg">'+[['tudo','Tudo'],['entradas','Entradas'],['saidas','Saídas']].map(function(o){return '<button class="'+(AG===o[0]?'on':'')+'" onclick="AG=\''+o[0]+'\';render()">'+o[1]+'</button>'}).join('')+'</div>'}
 function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
  var t=hoje(),it=itensMes(M),ult=addD(addM(M,1)+'-01',-1),p=projecaoAte(ult<t?t:ult),r=resumoMes(M);
- var entra=r.seguro+r.reembRec+r.reembPrev,sai=r.pagar,sob=entra-sai;
+ var entra=r.seguro,sai=r.pagar-paiNasFaturas(it),sob=entra-sai;
  var h=mnav()+'<div class="tri3"><div><span>Entra</span><b class="pos">'+c2s(entra)+'</b></div><div><span>Sai</span><b class="neg">'+c2s(sai)+'</b></div><div><span>'+(sob<0?'Falta':'Sobra')+'</span><b class="'+(sob<0?'neg':'pos')+'">'+c2s(Math.abs(sob))+'</b></div></div>'+segAg();
  var xs=comParciais(it.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'&&x.status!=='cartao'&&!adiadaVazia(x)&&!(x.kind==='reemb'&&x.status!=='pago')&&(AG==='tudo'||(AG==='entradas'?x.sinal>0:x.sinal<0))}),M);
  if(!xs.length)return h+'<div class="vazio">Nada neste mês.</div>';
@@ -1901,7 +1901,9 @@ function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
  /* Hudson 14/11: cada dia com o título grande, por extenso (igual aos Gastos), e as contas do dia num bloco só dele */
  ord.forEach(function(d){var sd=d!=='zz'&&d>=t&&p.saldo!=null&&p.dias[d]?p.dias[d].saldo:null;
   h+='<div class="gday'+(d===t?' hoje':'')+'"><b>'+(d==='zz'?'Sem data':esc(diaLongo(d)))+'</b><span'+(sd!=null&&sd<0?' class="neg"':'')+'>'+(sd!=null?'saldo '+c2s(sd):'')+'</span></div><div class="card cn">';
-  dias[d].forEach(function(x){h+=rowN(x,{sub:x.status==='pago'?(x.sinal>0?'recebido':'pago'):(x.data<t&&x.resta>0?'<span class="neg">'+(x.sinal>0?'atrasado':'em aberto')+'</span>':(x.cert==='incerta'?'incerto':'')),v:x.status==='pago'?x.valor:(x.resta>0?x.resta:x.valor)})});
+  dias[d].forEach(function(x){var fp=x.kind==='fatura'&&x.pai>0,st=x.status==='pago'?(x.sinal>0?'recebido':'pago'):(x.data<t&&x.resta>0?'<span class="neg">'+(x.sinal>0?'atrasado':'em aberto')+'</span>':(x.cert==='incerta'?'incerto':''));
+   if(fp)st=(st?st+' · ':'')+'sua parte · fatura '+c2s(x.valor)+' (seu pai '+c2s(x.pai)+')';
+   h+=rowN(x,{sub:st,v:fp?(x.status==='pago'||!(suaR(x)>0)?suaV(x):suaR(x)):(x.status==='pago'?x.valor:(x.resta>0?x.resta:x.valor))})});
   h+='</div>'});
  return h}
 
