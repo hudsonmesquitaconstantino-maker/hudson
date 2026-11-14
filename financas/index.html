@@ -194,7 +194,7 @@ header .gear{border:0;background:var(--chip);color:var(--tx2);width:34px;height:
 .cc2{border-radius:22px;padding:15px 17px;margin:12px 0;color:#fff;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.14)}.cc2 .l1{display:flex;justify-content:space-between;font-size:14px;font-weight:650;opacity:.92}.cc2 .amt{font-size:30px;font-weight:780;letter-spacing:-.6px;margin:6px 0 4px}
 .kv2{display:flex;justify-content:space-between;padding:11px 0;font-size:15px;border-top:.5px solid var(--line)}.cn>.kv2:first-child{border-top:0}.kv2 span{color:var(--tx2)}.kv2.tot{border:0;padding:4px 4px 0}
 .car2 .l1{display:flex;justify-content:space-between;align-items:center}.car2 .l1 b{font-size:18px}.car2 .l2{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}.car2 .l2 span{font-size:14px;color:var(--tx2)}.car2 .l2 b{font-size:19px}
-.mini{text-align:center;font-size:13px;color:var(--tx2);margin:10px 0}.mini a{color:var(--acc);font-weight:650;cursor:pointer}
+.mini{text-align:center;font-size:13px;color:var(--tx2);margin:10px 0}.tri3.rs{margin-top:0}.tri3.rs .ok{background:var(--grn2)}.tri3.rs .ok b{color:var(--grn)}.tri3.rs .bad{background:var(--red2)}.tri3.rs .bad b{color:var(--red)}.mini a{color:var(--acc);font-weight:650;cursor:pointer}
 .gday{display:flex;justify-content:space-between;align-items:baseline;margin:22px 4px 8px}.gday b{font-size:17px;font-weight:720;letter-spacing:-.2px}.gday span{font-size:15px;font-weight:650;color:var(--tx2)}.gday.hoje b{color:var(--acc)}
 .rn .s b.ft{font-weight:600;color:var(--tx2)}.rn .s b.ft.perto{color:var(--yel)}
 .dh{font-size:14px;padding:18px 0 4px;color:var(--tx)}
@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=62, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=63, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1855,10 +1855,11 @@ function vHoje(){
  var t=hoje(),fim=addD(addM(ymOf(t),1)+'-01',-1),p=projecaoAte(addD(t,30)>fim?addD(t,30):fim),h='';
  /* topo: dinheiro hoje + como o mês fecha */
  if(p.saldo==null)h+='<div class="hero2 tap" onclick="abrirSaldo()"><div class="lb">Dinheiro hoje</div><div class="val">—</div><div class="fx">Toque para informar o saldo</div></div>';
- else{var f=(p.dias[fim]||{saldo:p.saldo}).saldo;h+='<div class="hero2 tap" onclick="abrirSaldo()"><div class="lb">Dinheiro hoje</div><div class="val">'+c2s(p.saldo)+'</div><div class="fx '+(f<0?'neg':'ok')+'">'+capM(ymOf(t))+' fecha '+(f<0?'faltando ':'sobrando ')+c2s(Math.abs(f))+'</div></div>'}
+ else{var f=(p.dias[fim]||{saldo:p.saldo}).saldo;h+='<div class="hero2 tap" onclick="abrirSaldo()"><div class="lb">Dinheiro hoje</div><div class="val">'+c2s(p.saldo)+'</div><div class="fx '+(f<0?'neg':'ok')+'">'+(f<0?'Fim de '+mesSo0(ymOf(t))+': faltam '+c2s(-f)+' na conta':'Fim de '+mesSo0(ymOf(t))+': '+c2s(f)+' na conta')+'</div></div>'}
  /* só se for faltar dinheiro: em qual conta e quanto */
  if(p.saldo!=null){var fa=p.outs.filter(function(o){return o.saldo<0&&o.x.resta>0})[0];
   if(fa)h+='<div class="falta tap" onclick="'+acaoItem(fa.x)+'"><div class="ic">!</div><div class="g"><b>Falta '+c2s(-fa.saldo)+'</b><span>'+esc(fa.x.titulo)+' · '+dcurto(fa.x.atrasado?fa.x.dataOrig:fa.data)+' · '+faltaTxt(fa.x.atrasado?fa.x.dataOrig:fa.data)+'</span></div><div class="ch">›</div></div>'}
+ h+=resumoHoje();
  h+=cardClass();
  /* receber e cobrar */
  var rec=receberHoje();if(rec.length){var tr=soma(rec,function(r){return r.v});
@@ -2016,6 +2017,21 @@ nuSalvar=function(){if(!NU||!NU.edit)return _nuSalvarN();nuLer();var n=NU,l=porI
  var card=saiu&&ehCartao(n.meio),p={tipo:saiu?'gasto':'entrada',valor:v,data:n.data||l.data,desc:desc,meio:n.meio,cat:saiu?(n.cat||'A classificar'):null,de:card?n.de:'eu',parc:card?(+n.parc||1):1,carro:n.carro&&carro(n.carro)?n.carro:null};
  if(saiu!==(l.tipo==='gasto'))p.orig=saiu?null:(/multa/i.test(desc)&&p.carro?'multa':'outra');
  editar(l,p);save();_memo=null;fechar();render();toast('Salvo')};
+
+/* ===== Hudson 14/11: resumo do mês no Hoje — quanto ENTROU e quanto SAIU da SUA parte e quanto sobrou (verde/vermelho).
+   Dinheiro de verdade (caixa): reembolso do pai não é entrada, a parte dele na fatura não é saída, empréstimo não é renda,
+   compra no cartão sai quando você paga a fatura. Embaixo, o previsto do mês inteiro (o mesmo da Agenda). ===== */
+function mesSo0(ym){return MESES[+ym.slice(5,7)-1]}
+function resumoReal(ym){var it=itensMes(ym),ent=0,sai=0;
+ it.forEach(function(x){if(x.kind==='reemb'||x.status==='parado'||x.status==='adiantado'||x.status==='cartao')return;
+  if(x.kind==='lanc'&&(/dívida/.test(x.titulo)||x.titulo==='Ajuste de saldo'))return;
+  if(x.sinal>0){var r=x.status==='adiado'?((x.multaInfo&&x.multaInfo.rec)||0):Math.max(0,(x.valor||0)-(x.resta||0));ent+=r}
+  else if(x.sinal<0)sai+=Math.max(0,suaV(x)-suaR(x))});
+ var r=resumoMes(ym),pe=r.seguro,ps=r.pagar-paiNasFaturas(it);return {ent:ent,sai:sai,sob:ent-sai,pe:pe,ps:ps,psob:pe-ps}}
+function resumoHoje(){var ym=ymOf(hoje()),r=resumoReal(ym),pos=r.sob>=0;
+ return '<div class="sec"><div class="sech"><span>'+capM(ym)+' até hoje</span><a onclick="AG=\'tudo\';go(\'agenda\')">ver mês ›</a></div>'+
+  '<div class="tri3 rs"><div><span>Entrou</span><b class="pos">'+c2s(r.ent)+'</b></div><div><span>Saiu</span><b class="neg">'+c2s(r.sai)+'</b></div><div class="'+(pos?'ok':'bad')+'"><span>'+(pos?'Sobrou':'Faltou')+'</span><b>'+(pos?'+':'−')+c2s(Math.abs(r.sob)).replace('−','')+'</b></div></div>'+
+  '<div class="mini" style="margin:6px 0 0;text-align:left;padding:0 4px">Mês inteiro (previsto): entra '+c2s(r.pe)+' · sai '+c2s(r.ps)+' · <b class="'+(r.psob<0?'neg':'pos')+'">'+(r.psob<0?'falta ':'sobra ')+c2s(Math.abs(r.psob))+'</b></div></div>'}
 
 /* ---------- início ---------- */
 S=load();migra();M=mesPadrao();ML=ymOf(hoje());render();
