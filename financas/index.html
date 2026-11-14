@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=55, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=56, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -2161,6 +2161,9 @@ html.af body>.afFix{position:absolute!important}
 html.af.afKb body{bottom:auto!important;height:var(--afVvh,100vh)!important}
 html.af.afKb #tabs{display:none!important}
 html.af body::before{content:'';position:absolute;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30;pointer-events:none}
+/* Hudson 14/11: nada aparece por baixo/ao redor da barra flutuante — o fundo do app cobre essa faixa */
+html.af body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:calc(env(safe-area-inset-bottom,0px) + 98px);background:linear-gradient(to bottom,transparent 0,var(--bg) 26px,var(--bg) 100%);z-index:19;pointer-events:none}
+html.af.afKb body::after,html.tecladoAberto body::after{display:none}
 </style>
 <script id="afJs">
 (function(){
