@@ -84,7 +84,7 @@ h3{font:600 24px/1.15 var(--serif);margin:0 0 4px;letter-spacing:-.3px}
 .seg button{flex:1;border:0;background:none;border-radius:12px;padding:9px 4px;font:800 14px var(--sans);color:var(--tx2)}
 .seg button.on{background:var(--card);color:var(--rose);box-shadow:0 2px 8px rgba(120,60,100,.1)}
 .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
-.tri span{display:block;font-size:12px;color:var(--tx2);font-weight:700}.tri b{font-size:16.5px;font-variant-numeric:tabular-nums}
+.tri span{display:block;font-size:12px;color:var(--tx2);font-weight:700}.tri b{display:block;font-size:min(16.5px,3.9vw);letter-spacing:-.2px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .chips{display:flex;flex-wrap:wrap;gap:7px}
 .chips button{border:0;border-radius:999px;padding:8px 13px;font:700 14px var(--sans);background:var(--chip);color:var(--tx)}
 .chips button.on{background:var(--rose);color:#fff}
@@ -145,7 +145,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=6,APP_DATE='14/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=7,APP_DATE='14/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -777,9 +777,11 @@ function balanco(ym){var it=itensMes(ym),rec=0,inc=0,des=0,ent=0,sai=0;
   else if(l.tipo==='pagfixa'||l.tipo==='pagfatura')sai+=l.valor||0});
  cartoes().forEach(function(c){var x=fatura(c.id,ym),pr=soma(x.pags,function(l){return l.valor});if(x.quitada&&x.vence<=hoje())sai+=Math.max(0,x.valor-pr)});
  return {rec:rec,inc:inc,des:des,luc:rec-des,ent:ent,sai:sai}}
+/* resultado do mês = receitas − despesas, com sinal: verde positivo, vermelho negativo */
+function resultadoB(v){return '<b class="'+(v>0?'pos':v<0?'neg':'')+'">'+(v>0?'+':'')+c2s(v)+'</b>'}
 function balancoMes(){var ym=ymOf(hoje()),b=balanco(ym);if(!b.rec&&!b.des&&!b.ent&&!b.sai)return '';var pos=b.luc>=0;
  return '<div class="card tap" onclick="abrirBalanco(\''+ym+'\')"><div class="kv" style="padding:0 0 8px"><h2 style="margin:0">'+cap(mesSo(ym))+' · balanço</h2><span class="sub">ver tudo ›</span></div>'+
-  '<div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>'+(pos?'Sobra':'Falta')+'</span><b class="'+(pos?'pos':'neg')+'">'+c2s(Math.abs(b.luc))+'</b></div></div>'+
+  '<div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>Resultado</span>'+resultadoB(b.luc)+'</div></div>'+
   '<div class="sub" style="margin-top:10px;text-align:center">Até hoje: entrou <b class="pos">'+c2s(b.ent)+'</b> · saiu <b class="neg">'+c2s(b.sai)+'</b>'+(b.inc>0?' · + '+c2s(b.inc)+' incerto':'')+'</div></div>'}
 
 function abrirBalanco(ym){var b=balanco(ym),it=itensMes(ym),t=hoje();
@@ -791,7 +793,7 @@ function abrirBalanco(ym){var b=balanco(ym),it=itensMes(ym),t=hoje();
  var pix=lista('lanc').filter(function(l){return l.tipo==='gasto'&&!ehCartao(l.meio)&&ymOf(l.data)===ym}),pt=soma(pix,function(l){return l.valor});if(pt)D.push({d:ym+'-99',h:linha('Gastos no Pix/débito',null,pt,pix.length+' gasto'+(pix.length>1?'s':'')+' · veja em Gastos','',"fechar();go('gastos')")});
  R.sort(function(a,b){return a.d<b.d?-1:1});D.sort(function(a,b){return a.d<b.d?-1:1});
  var h='<h3>'+cap(mesNome(ym))+'</h3><div class="sub">Tudo o que entra e sai no mês — toque num item para pagar, receber ou mudar.</div>';
- h+='<div class="card" style="margin-top:12px"><div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>'+(b.luc>=0?'Sobra':'Falta')+'</span><b class="'+(b.luc>=0?'pos':'neg')+'">'+c2s(Math.abs(b.luc))+'</b></div></div></div>';
+ h+='<div class="card" style="margin-top:12px"><div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>Resultado</span>'+resultadoB(b.luc)+'</div></div></div>';
  h+='<div class="card"><h2>💰 Receitas</h2>'+(R.length?R.map(function(o){return o.h}).join(''):'<div class="empty">Nenhuma receita neste mês.</div>')+'</div>';
  h+='<div class="card"><h2>🧾 Despesas</h2>'+(D.length?D.map(function(o){return o.h}).join(''):'<div class="empty">Nenhuma despesa neste mês.</div>')+'<div class="sub" style="margin-top:8px">Cartão entra pelo valor da fatura que vence no mês (as compras ficam dentro dela).</div></div>';
  abrir(h+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
