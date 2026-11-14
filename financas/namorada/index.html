@@ -24,7 +24,8 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:16px/1.4 var(--sans);-webkit-text-size-adjust:100%;overscroll-behavior:none}
 /* moldura fixa: só o miolo rola, a barra de baixo fica presa (no iPhone a barra presa à janela afunda) */
 body{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
-#rola{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 108px)}
+#rola{flex:0 1 auto;height:calc(100% - env(safe-area-inset-bottom) - 88px);min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:calc(env(safe-area-inset-top) + 12px) 0 18px}
+html.teclado #rola{height:100%}
 header{padding:6px 20px 4px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
 h1{font:600 34px/1.05 var(--serif);letter-spacing:-.6px;margin:0}
 .hd{font-size:13px;color:var(--tx2);text-align:right;line-height:1.3}
@@ -144,7 +145,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=3,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=4,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -307,9 +308,10 @@ function vInicio(){var t=hoje(),h='';
  h+='<div class="hero'+(p.saldo!=null?' tap" onclick="abrirSaldo()':'')+'"><div class="lb">Seu dinheiro hoje</div>';
  if(p.saldo==null){h+='<div class="det" style="margin-top:6px">Conte quanto tem agora no banco para o app fazer as contas do mês.</div><button onclick="event.stopPropagation();abrirSaldo()">Informar meu saldo</button>'}
  else{h+='<div class="val">'+c2s(p.saldo)+'</div><div class="det">'+(cs.length>1?cs.map(function(c){return esc(c.nome)+' '+c2s(saldoConta(c))}).join(' · '):'em '+esc(cs[0].nome))+' · toque para corrigir</div>';
-  var pos=p.fim>=0;h+='<div class="strip"><div class="ico">'+(pos?'✓':'!')+'</div><div><b>'+mesSo(ymOf(t)).replace(/^./,function(c){return c.toUpperCase()})+' fecha '+(pos?'positivo: sobram ':'negativo: faltam ')+c2s(Math.abs(p.fim))+'</b><span>'+(p.inc>0?'sem contar '+c2s(p.inc)+' incerto':'conta com o que é provável entrar até '+dcurto(fimMes))+'</span></div></div>'}
+  var pos=p.fim>=0;h+='<div class="strip"><div class="ico">'+(pos?'✓':'!')+'</div><div><b>'+mesSo(ymOf(t)).replace(/^./,function(c){return c.toUpperCase()})+(pos?': '+c2s(p.fim)+' na conta no fim do mês':': faltam '+c2s(-p.fim)+' na conta no fim do mês')+'</b><span>'+(p.inc>0?'sem contar '+c2s(p.inc)+' incerto':'conta com o que é provável entrar até '+dcurto(fimMes))+'</span></div></div>'}
  h+='</div>';
  var ps=passos();if(!ps.todos&&!cfg().semGuia)h+='<div class="card"><div class="kv" style="padding:0 0 4px"><h2 style="margin:0">Vamos terminar de arrumar</h2><a class="sub tap" onclick="muda(\'cfg\',\'geral\',{semGuia:1});render()">ocultar</a></div>'+ps.h+'</div>';
+ h+=balancoMes();
  /* aperto */
  if(p.saldo!=null){var p45=projecao(addD(t,45)),ap=p45.outs.filter(function(o){return o.saldo<0})[0];
   if(ap)h+='<div class="card" style="border:1.5px solid var(--coral2)"><div class="kv" style="padding:0"><div><div class="sub" style="font-weight:800;color:var(--coral)">Atenção: vai faltar dinheiro</div><div style="font-weight:800;font-size:16px;margin-top:2px">'+esc(ap.x.titulo)+'</div><div class="sub">'+dlab(ap.dia)+' · '+quando(ap.dia)+'</div></div><div style="text-align:right"><div class="sub">faltam</div><b class="neg" style="font-size:20px">'+c2s(-ap.saldo)+'</b></div></div>'+(ap.inc>0?'<div class="sub" style="margin-top:8px">Se o incerto até lá entrar ('+c2s(ap.inc)+'), '+(ap.saldo+ap.inc>=0?'dá e sobra '+c2s(ap.saldo+ap.inc):'ainda faltam '+c2s(-(ap.saldo+ap.inc)))+'.</div>':'')+'</div>'}
@@ -420,7 +422,7 @@ function catApagar(id){var c=reg('cats',id);if(!c||!confirm('Apagar a categoria 
 
 /* ---------- janela de baixo ---------- */
 function abrir(h){var ov=document.getElementById('ov'),sh=document.getElementById('sheet');sh.innerHTML=h;ov.classList.add('open');sh.scrollTop=0}
-function fechar(){document.getElementById('ov').classList.remove('open');document.getElementById('sheet').innerHTML=''}
+function fechar(){try{var a=document.activeElement;if(a&&a!==document.body&&a.blur)a.blur()}catch(e){}document.getElementById('ov').classList.remove('open');document.getElementById('sheet').innerHTML='';setTimeout(function(){if(window.__tecUpd)window.__tecUpd()},30)}
 function toast(m,undo){var t=document.getElementById('toast');t.innerHTML=esc(m)+(undo?'<button onclick="desfazerRapido()">Desfazer</button>':'');toast._u=undo||null;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('on');toast._u=null},undo?6000:2600)}
 function desfazerRapido(){var u=toast._u;toast._u=null;if(!u)return;u.forEach(function(x){if(x[2]==='volta')muda(x[0],x[1],{del:false});else apaga(x[0],x[1])});render();if(document.getElementById('ov').classList.contains('open'))fechar();toast('Desfeito')}
 function fMoney(id,label,c,help){return '<div class="f"><label>'+label+'</label><input id="'+id+'" class="money" inputmode="decimal" placeholder="0,00" value="'+c2in(c)+'">'+(help?'<small>'+help+'</small>':'')+'</div>'}
@@ -762,8 +764,21 @@ function importar(inp){var f=inp.files&&inp.files[0];if(!f)return;var rd=new Fil
 function checaVersao(manual){fetch('./index.html?nv='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/APP_VER=(\d+)/);if(m&&+m[1]>APP_VER){VER_NOVA=1;render();setTimeout(function(){location.reload()},600)}else if(manual)toast('Você está na versão mais nova ✨')}).catch(function(){if(manual)toast('Sem internet agora')})}
 
 /* ---------- teclado: a barra de baixo some enquanto digita ---------- */
-(function(){var R=document.documentElement;function campo(e){if(!e)return false;var t=e.tagName;return t==='TEXTAREA'||t==='SELECT'||(t==='INPUT'&&!/^(button|submit|checkbox|radio|file|hidden)$/i.test(e.type||''))}
- function upd(){R.classList.toggle('teclado',campo(document.activeElement))}document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,120)},true)})();
+(function(){var R=document.documentElement;function campo(e){if(!e||!e.isConnected)return false;var t=e.tagName;return t==='TEXTAREA'||(t==='INPUT'&&!/^(button|submit|checkbox|radio|file|hidden|date|month|time|range|color)$/i.test(e.type||''))}
+ function upd(){var on=campo(document.activeElement);if(on!==R.classList.contains('teclado'))R.classList.toggle('teclado',on)}window.__tecUpd=upd;document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,120)},true);document.addEventListener('touchend',function(){setTimeout(upd,60)},true);setInterval(upd,500)})();
+
+/* ---------- balanço do mês (Hudson 14/11): quanto entra, quanto sai e quanto sobra — previsto do mês e o que já aconteceu ---------- */
+function balanco(ym){var it=itensMes(ym),rec=0,inc=0,des=0,ent=0,sai=0;
+ it.forEach(function(x){if(x.apagada&&!x.rec)return;if(x.sinal>0){if(x.cert==='incerta')inc+=Math.max(0,x.valor-x.rec);else rec+=x.valor;if(x.cert==='incerta')rec+=x.rec}else des+=x.valor});
+ lista('lanc').forEach(function(l){if(ymOf(l.data)!==ym)return;
+  if(l.tipo==='entrada'){ent+=l.valor||0;if(!l.ref)rec+=l.valor||0}
+  else if(l.tipo==='gasto'){if(!ehCartao(l.meio)){sai+=l.valor||0;des+=l.valor||0}}
+  else if(l.tipo==='pagfixa'||l.tipo==='pagfatura')sai+=l.valor||0});
+ return {rec:rec,inc:inc,des:des,luc:rec-des,ent:ent,sai:sai}}
+function balancoMes(){var ym=ymOf(hoje()),b=balanco(ym);if(!b.rec&&!b.des&&!b.ent&&!b.sai)return '';var pos=b.luc>=0;
+ return '<div class="card tap" onclick="go(\'receber\')"><div class="kv" style="padding:0 0 8px"><h2 style="margin:0">'+cap(mesSo(ym))+' · balanço</h2><span class="sub">previsto</span></div>'+
+  '<div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>'+(pos?'Sobra':'Falta')+'</span><b class="'+(pos?'pos':'neg')+'">'+c2s(Math.abs(b.luc))+'</b></div></div>'+
+  '<div class="sub" style="margin-top:10px;text-align:center">Até hoje: entrou <b class="pos">'+c2s(b.ent)+'</b> · saiu <b class="neg">'+c2s(b.sai)+'</b>'+(b.inc>0?' · + '+c2s(b.inc)+' incerto':'')+'</div></div>'}
 
 /* ---------- início ---------- */
 if(!S.cfg.geral)S.cfg.geral={id:'geral',inicio:ymOf(hoje()),at:0};
