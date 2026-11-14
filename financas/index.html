@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=58, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=59, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1259,7 +1259,7 @@ function filho(fn,a,b){var sh=document.getElementById('sheet');PILHA.push({fn:fu
 function abrir(h){var sh=document.getElementById('sheet'),ov=document.getElementById('ov');if(!ov.classList.contains('open'))PILHA=[];sh.style.transform='';sh.innerHTML='<div class="grabArea"><div class="grab"></div></div>'+h;if(!ov.classList.contains('open'))folhaTrava(true);ov.classList.add('open');sh.scrollTop=0;
  if(PILHA.length)[].forEach.call(sh.querySelectorAll('button.btn.sec'),function(b){if(/^(Fechar|Cancelar)$/.test(b.textContent.trim()))b.textContent='‹ Voltar'})}
 function fecharTudo(){PILHA=[];fechar()}
-function fechar(){var ov=document.getElementById('ov');try{var ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur()}catch(e){}if(!ov.classList.contains('open'))return;
+function fechar(){var ov=document.getElementById('ov');try{var ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur()}catch(e){}setTimeout(function(){try{if(window.__tecladoUpd)window.__tecladoUpd()}catch(e){}},30);if(!ov.classList.contains('open'))return;
  if(PILHA.length){var p=PILHA.pop(),sh0=document.getElementById('sheet');try{p.fn()}catch(e){PILHA=[];return fechar()}sh0.scrollTop=p.top;return}ov.classList.remove('open');var sh=document.getElementById('sheet');sh.innerHTML='';sh.style.transform='';folhaTrava(false)}
 /* ---------- janela de baixo (lançar, editar…) firme no iPhone — Hudson 02/11/2026 ----------
    • a página de trás não rola nem "puxa" junto quando você arrasta dentro da janela;
@@ -2111,9 +2111,12 @@ button.okb{background:var(--acc);color:#04150F}
 :root:is(#escA,html).tecladoAberto body:is(#escB,body) #tabs{display:none!important}
 </style>
 <script id="tecladoBarra">/* Hudson 06/11: com o teclado aberto, a barra flutuante de baixo some (não cobre o que você está digitando) */
-(function(){var R=document.documentElement;function campo(e){if(!e)return false;var t=e.tagName;if(t==='TEXTAREA'||t==='SELECT'||e.isContentEditable)return true;return t==='INPUT'&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(e.type||'')}
-function upd(){var vv=window.visualViewport,kb=vv?(window.innerHeight-vv.height*vv.scale>140):false;R.classList.toggle('tecladoAberto',campo(document.activeElement)||kb)}
-document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,150)},true);if(window.visualViewport)window.visualViewport.addEventListener('resize',upd)})();
+/* Hudson 14/11: só esconde a barra com TECLADO de verdade. Lista de escolher (carro, parcelas), data e campo que já sumiu da tela
+   (janela fechada) não contam — antes a barra sumia e não voltava depois de escolher o carro e salvar. Confere sozinho a cada meio segundo. */
+(function(){var R=document.documentElement;function campo(e){if(!e||!e.isConnected||e===document.body)return false;if(e.closest&&!e.closest('#sheet,#main,header')&&e.tagName!=='TEXTAREA')return false;var t=e.tagName;if(t==='TEXTAREA'||e.isContentEditable)return true;return t==='INPUT'&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden|date|month|time|datetime-local|week)$/i.test(e.type||'')}
+function upd(){var on=campo(document.activeElement);if(on!==R.classList.contains('tecladoAberto'))R.classList.toggle('tecladoAberto',on)}
+window.__tecladoUpd=upd;document.addEventListener('focusin',upd,true);document.addEventListener('focusout',function(){setTimeout(upd,150)},true);if(window.visualViewport)window.visualViewport.addEventListener('resize',upd);
+document.addEventListener('touchend',function(){setTimeout(upd,60)},true);setInterval(upd,500)})();
 </script>
 <script id="catsUser">var _catsLinkObj=null;
 /* ===== Hudson 07/11: CATEGORIAS SUAS ("títulos") — criar, renomear, apagar; já vem "Namorada".
@@ -2216,7 +2219,7 @@ html.af.afKb body::after,html.tecladoAberto body::after{display:none}
  var toque=false;try{toque=window.matchMedia('(pointer:coarse)').matches||('ontouchstart' in window)}catch(e){}
  function campo(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|email|url|number|password|)$/i.test(el.type||''))||!!el.isContentEditable)&&!el.readOnly&&!el.disabled}
  function aplicar(){raf=0;if(foco&&!(campo(document.activeElement)&&document.documentElement.contains(document.activeElement)))foco=false;if(!foco||window.innerHeight>base)base=Math.max(window.innerHeight,foco?base:0);
-  var h=vv?vv.height:window.innerHeight,kb=vv?Math.max(0,base-vv.height,window.innerHeight-vv.height):0,agora=foco&&(toque||kb>120||!vv)||kb>150;
+  var h=vv?vv.height:window.innerHeight,kb=vv?Math.max(0,base-vv.height,window.innerHeight-vv.height):0,agora=foco&&campo(document.activeElement)&&document.activeElement.isConnected&&(toque||kb>120||!vv);
   var v=Math.round(h)+'px';if(v!==de._afv){de._afv=v;de.style.setProperty('--afVvh',v)}
   if(agora!==aberto){aberto=agora;de.classList.toggle('afKb',agora)}}
  function agenda(){if(!raf)raf=(window.requestAnimationFrame||setTimeout)(aplicar)}
