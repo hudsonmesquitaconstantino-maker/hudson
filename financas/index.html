@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=57, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=58, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1991,6 +1991,29 @@ function nuDesenha(){var n=NU,saiu=n.tipo==='out',card=saiu&&ehCartao(n.meio),fu
  h+='<button class="btn" style="font-size:17px;padding:15px" onclick="nuSalvar()">Salvar</button>';
  h+='<div class="outros"><a onclick="NL=null;novoLanc(\'reembolso\')">Reembolso do pai</a><a onclick="NL=null;novoLanc(\'emprestimo\')">Empréstimo</a><a onclick="NL=null;novoLanc(\'transf\')">Transferência</a></div>';
  var sh=document.getElementById('sheet'),aberto=document.getElementById('ov').classList.contains('open'),st=aberto?sh.scrollTop:0;abrir(h);if(aberto)sh.scrollTop=st}
+
+/* ===== Hudson 14/11: EDITAR também no formulário novo (com o carro: "combustível do Onix") =====
+   Gasto ou entrada comum abre aqui; o resto (reembolso, empréstimo, transferência, conta fixa, fatura importada) segue no completo. */
+var _abrirLancOrig=abrirLanc,_lancAntigo=0;
+abrirLanc=function(id){var l=porId(S.lanc,id);if(l&&!_lancAntigo&&!l.del&&!l.fat&&!l.ref&&!l.fonte&&(l.tipo==='gasto'||l.tipo==='entrada'))return editarUnico(l);return _abrirLancOrig(id)};
+function lancCompleto(id){_lancAntigo=1;try{_abrirLancOrig(id)}finally{_lancAntigo=0}}
+function editarUnico(l){var m=conta(l.meio)||cartao(l.meio);
+ NU={id:l.id,edit:true,tipo:l.tipo==='entrada'?'in':'out',desc:l.desc||'',valor:l.valor,data:l.data,feito:true,carro:l.carro&&carro(l.carro)?l.carro:'',meio:m&&!m.del?l.meio:contaPadrao(),meioBase:l.meio,parc:+l.parc||1,de:l.de==='pai'?'pai':'eu',
+  cat:l.cat&&l.cat!=='A classificar'?l.cat:'',catMan:true,meioMan:true,deMan:true,carroMan:true,verCats:false,pal:null};nuDesenha()}
+var _nuDesenhaN=nuDesenha;
+nuDesenha=function(){_nuDesenhaN();if(!NU||!NU.edit)return;var sh=document.getElementById('sheet');
+ var h3=sh.querySelector('.lhead h3');if(h3)h3.textContent='Editar';
+ var ch=[].filter.call(sh.querySelectorAll('.chips'),function(c){return /Ainda não \(agendar\)/.test(c.textContent)})[0];if(ch)ch.remove();
+ var o=sh.querySelector('.outros');if(o)o.innerHTML='<a onclick="lancCompleto(\''+NU.id+'\')">Mais opções</a><a style="color:var(--red)" onclick="nuApagar()">Apagar</a>'};
+var _nuPalN=nuPalHtml;nuPalHtml=function(){return NU&&NU.edit?'':_nuPalN()};
+function nuApagar(){var l=porId(S.lanc,NU&&NU.id);if(!l)return;if(!confirm('Apagar este lançamento?'))return;editar(l,{del:true});save();_memo=null;fechar();render();toast('Apagado')}
+var _nuSalvarN=nuSalvar;
+nuSalvar=function(){if(!NU||!NU.edit)return _nuSalvarN();nuLer();var n=NU,l=porId(S.lanc,n.id);if(!l)return;
+ var v=n.valor;if(v==null||v<=0){toast('Digite o valor');return}var desc=String(n.desc||'').trim();if(desc)desc=desc.charAt(0).toUpperCase()+desc.slice(1);
+ var saiu=n.tipo==='out';if(!saiu&&!desc){toast('Escreva o que é');return}if(!saiu&&ehCartao(n.meio))n.meio=contaPadrao();
+ var card=saiu&&ehCartao(n.meio),p={tipo:saiu?'gasto':'entrada',valor:v,data:n.data||l.data,desc:desc,meio:n.meio,cat:saiu?(n.cat||'A classificar'):null,de:card?n.de:'eu',parc:card?(+n.parc||1):1,carro:n.carro&&carro(n.carro)?n.carro:null};
+ if(saiu!==(l.tipo==='gasto'))p.orig=saiu?null:(/multa/i.test(desc)&&p.carro?'multa':'outra');
+ editar(l,p);save();_memo=null;fechar();render();toast('Salvo')};
 
 /* ---------- início ---------- */
 S=load();migra();M=mesPadrao();ML=ymOf(hoje());render();
