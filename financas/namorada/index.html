@@ -145,7 +145,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=4,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=5,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -774,11 +774,26 @@ function balanco(ym){var it=itensMes(ym),rec=0,inc=0,des=0,ent=0,sai=0;
   if(l.tipo==='entrada'){ent+=l.valor||0;if(!l.ref)rec+=l.valor||0}
   else if(l.tipo==='gasto'){if(!ehCartao(l.meio)){sai+=l.valor||0;des+=l.valor||0}}
   else if(l.tipo==='pagfixa'||l.tipo==='pagfatura')sai+=l.valor||0});
+ cartoes().forEach(function(c){var x=fatura(c.id,ym),pr=soma(x.pags,function(l){return l.valor});if(x.quitada&&x.vence<=hoje())sai+=Math.max(0,x.valor-pr)});
  return {rec:rec,inc:inc,des:des,luc:rec-des,ent:ent,sai:sai}}
 function balancoMes(){var ym=ymOf(hoje()),b=balanco(ym);if(!b.rec&&!b.des&&!b.ent&&!b.sai)return '';var pos=b.luc>=0;
- return '<div class="card tap" onclick="go(\'receber\')"><div class="kv" style="padding:0 0 8px"><h2 style="margin:0">'+cap(mesSo(ym))+' · balanço</h2><span class="sub">previsto</span></div>'+
+ return '<div class="card tap" onclick="abrirBalanco(\''+ym+'\')"><div class="kv" style="padding:0 0 8px"><h2 style="margin:0">'+cap(mesSo(ym))+' · balanço</h2><span class="sub">ver tudo ›</span></div>'+
   '<div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>'+(pos?'Sobra':'Falta')+'</span><b class="'+(pos?'pos':'neg')+'">'+c2s(Math.abs(b.luc))+'</b></div></div>'+
   '<div class="sub" style="margin-top:10px;text-align:center">Até hoje: entrou <b class="pos">'+c2s(b.ent)+'</b> · saiu <b class="neg">'+c2s(b.sai)+'</b>'+(b.inc>0?' · + '+c2s(b.inc)+' incerto':'')+'</div></div>'}
+
+function abrirBalanco(ym){var b=balanco(ym),it=itensMes(ym),t=hoje();
+ function linha(n,d,v,st,cls,on){return '<div class="row'+(on?' tap" onclick="'+on:'')+'"><div class="g"><div class="t">'+esc(n)+'</div><div class="s">'+st+'</div></div><div class="v '+(cls||'')+'">'+c2s(v)+'</div></div>'}
+ var R=[],D=[];
+ it.forEach(function(x){if(x.apagada&&!x.rec)return;var pago=x.resta<=0,st=(pago?(x.sinal>0?'recebido':'pago'):(x.data<t?'<span class="neg">'+(x.sinal>0?'atrasado':'venceu')+' '+dcurto(x.data)+'</span>':(x.sinal>0?'para receber ':'vence ')+dcurto(x.data)+' · '+quando(x.data)))+(x.cert==='incerta'&&!pago?' · incerto':'')+(x.rec>0&&!pago?' · já '+(x.sinal>0?'recebeu ':'pagou ')+c2s(x.rec):'');
+  var on="abrirItem('"+x.kind+"','"+x.id+"','"+(x.ym||'')+"')";(x.sinal>0?R:D).push({d:x.data,h:linha(x.titulo,x.data,x.valor,st,x.sinal>0?'pos':'',on)})});
+ var avs=lista('lanc').filter(function(l){return l.tipo==='entrada'&&!l.ref&&ymOf(l.data)===ym});avs.forEach(function(l){R.push({d:l.data,h:linha(l.desc||'Entrada',l.data,l.valor,'recebido '+dcurto(l.data)+' · Pix avulso','pos',"abrirLanc('"+l.id+"')")})});
+ var pix=lista('lanc').filter(function(l){return l.tipo==='gasto'&&!ehCartao(l.meio)&&ymOf(l.data)===ym}),pt=soma(pix,function(l){return l.valor});if(pt)D.push({d:ym+'-99',h:linha('Gastos no Pix/débito',null,pt,pix.length+' gasto'+(pix.length>1?'s':'')+' · veja em Gastos','',"fechar();go('gastos')")});
+ R.sort(function(a,b){return a.d<b.d?-1:1});D.sort(function(a,b){return a.d<b.d?-1:1});
+ var h='<h3>'+cap(mesNome(ym))+'</h3><div class="sub">Tudo o que entra e sai no mês — toque num item para pagar, receber ou mudar.</div>';
+ h+='<div class="card" style="margin-top:12px"><div class="tri"><div><span>Receitas</span><b class="pos">'+c2s(b.rec)+'</b></div><div><span>Despesas</span><b class="neg">'+c2s(b.des)+'</b></div><div><span>'+(b.luc>=0?'Sobra':'Falta')+'</span><b class="'+(b.luc>=0?'pos':'neg')+'">'+c2s(Math.abs(b.luc))+'</b></div></div></div>';
+ h+='<div class="card"><h2>💰 Receitas</h2>'+(R.length?R.map(function(o){return o.h}).join(''):'<div class="empty">Nenhuma receita neste mês.</div>')+'</div>';
+ h+='<div class="card"><h2>🧾 Despesas</h2>'+(D.length?D.map(function(o){return o.h}).join(''):'<div class="empty">Nenhuma despesa neste mês.</div>')+'<div class="sub" style="margin-top:8px">Cartão entra pelo valor da fatura que vence no mês (as compras ficam dentro dela).</div></div>';
+ abrir(h+'<button class="btn sec" onclick="fechar()">Fechar</button>')}
 
 /* ---------- início ---------- */
 if(!S.cfg.geral)S.cfg.geral={id:'geral',inicio:ymOf(hoje()),at:0};
