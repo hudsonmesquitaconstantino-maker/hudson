@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=59, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=60, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1000,7 +1000,7 @@ function resultadoCarro(car,ym){var k=contaCarro(car,ym),t=hoje(),cur=ymOf(t),pa
  viv(S.avulsas).forEach(function(a){if(a.carro!==car.id||ymOf(a.data)!==ym)return;var pg=soma(viv(S.lanc).filter(function(l){return l.ref===a.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')}),function(l){return l.valor}),r=a.valor-pg;if(r<=0)return;
   if(!a.receber&&manutViaGestao(car,a.cat||sugCat(a.desc)||'',a.foraGestao)){manAv+=r;return}
   var o={n:a.desc+' · '+(a.receber?'a receber ':'a pagar ')+dcurto(a.data),r:0,p:r,av:a.id};if(a.receber&&a.incerto)inc.push(o);else(a.receber?ins:outs).push(o)});
- k.custos.forEach(function(f){var v=valorFixa(f,ym),due=fixaMes(f,ym).due;outs.push({n:f.nome+(f.dia?' · dia '+f.dia:''),r:(passado||(!futuro&&due<=t))?v:0,p:v})});
+ k.custos.forEach(function(f){var v=valorFixa(f,ym),fm=fixaMes(f,ym),due=fm.due;outs.push({n:f.nome+(f.dia?' · dia '+f.dia:'')+(fm.pago>0&&due>t?' · já pago':''),r:(passado||(!futuro&&due<=t))?v:Math.min(v,fm.pago),p:v})});
  if(k.manConsid)outs.push({n:'Manutenção (sua parte'+(k.abat?', menos o abatido no semanal':'')+')',r:k.manConsid,p:k.manConsid});
  k.docs.forEach(function(o){outs.push({n:o.nome+' (pago '+dcurto(o.pago)+')',r:o.valor,p:o.valor})});
  var tot=function(l,c){return soma(l,function(o){return o[c]})},iR=tot(ins,'r'),iP=tot(ins,'p'),oR=tot(outs,'r'),oP=tot(outs,'p'),ks=Object.keys(atr).sort(),atrT=soma(ks,function(w){return atr[w]});
@@ -1692,14 +1692,14 @@ function novoReembolso(){if(precisaConta())return;NL={tipo:'reembolso',meio:(viv
 function novaTransf(){if(viv(S.contas).length<2){toast('Cadastre duas contas para transferir');return}NL={tipo:'transf',meio:viv(S.contas)[0].id,dest:viv(S.contas)[1].id,id:null};formLanc()}
 
 /* ---------- backup ---------- */
-function exportar(){var j=JSON.stringify(S),nome='financeiro-backup-'+hoje()+'.json';
+function exportar(){var j=JSON.stringify(Object.assign({},S,{_ext:(typeof EXT!=='undefined'?EXT:null)})),nome='financeiro-backup-'+hoje()+'.json';
  S.backupEm=Date.now();save();render();
  try{var file=new File([j],nome,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:nome}).catch(function(){});return}}catch(e){}
  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},500);toast('Backup gerado')}
 function importarArquivo(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result);if(d&&d.app==='financeiro-hudson-atualizacao')return aplicarAtualizacao(d);if(!d||d.app!=='financeiro-hudson')throw new Error('Este arquivo não é do Financeiro');
   if(!vazio()&&!confirm('Isto substitui TODOS os dados deste aparelho pelos do arquivo. Continuar?'))return;
   if(!vazio()){try{localStorage.setItem(KEY+'_antes_import',JSON.stringify(S))}catch(e){}}
-  S=norm(d);migra();M=mesPadrao();save();render();toast('Dados carregados')}catch(e){toast('⚠️ '+e.message)}};r.readAsText(f)}
+  delete d._ext;S=norm(d);migra();M=mesPadrao();save();render();toast('Dados carregados')}catch(e){toast('⚠️ '+e.message)}};r.readAsText(f)}
 /* ajustes únicos nos dados (não apaga nada) */
 function migra(){if(vazio())return;/* nunca grava por cima com o app vazio (protege a cópia interna) */var mud=false;if(!S.mig1){viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat==='Transporte'&&/posto|gasolina|etanol|combust|gnv|aleluia|osorio|tiririca|nossa senho/i.test(l.desc||'')){l.cat='Combustível';mud=true}});S.mig1=1;mud=true}if(mud)save()}
 function mesPadrao(){var m=ymOf(hoje());return S.inicio>m?S.inicio:m}
