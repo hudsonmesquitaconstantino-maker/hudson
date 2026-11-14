@@ -193,7 +193,7 @@ button.okb{flex:0 0 auto;width:40px;height:40px;margin-left:8px;border:0;border-
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=52, APP_DATE='12/11/2026', KEY='finH_estado_v1';
+var VER_NOVA=0,APP_VER=53, APP_DATE='14/11/2026', KEY='finH_estado_v1';
 var S=null, TAB='hoje', M=null, ML=null, PROJ_DIAS=30, AG='tudo';
 
 /* ---------- utilidades ---------- */
@@ -1017,7 +1017,7 @@ function acaoSemanal(){var cs=carrosAtivos();var t=hoje(),cand=[];
  cs.forEach(function(c){[addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<S.inicio)return;itensMes(ym).forEach(function(x){if(x.kind==='carro'&&x.id===c.id&&x.resta>0&&(x.status==='pendente'||x.status==='atrasado')&&x.data<=addD(t,6))cand.push(x)})})});
  if(!cand.length){go('carros');return}
  abrir('<h3>Qual semanal entrou?</h3><div class="sub" style="margin-bottom:6px">✓ = recebi tudo hoje. Desconto ou outro valor: toque no nome.</div>'+cand.map(function(x){return '<div class="row tap" onclick="filho(\'acaoSemanal\');abrirSemana(\'carro\',\''+x.id+'\',\''+x.sem+'\')"><div class="bub in">🚗</div><div class="g"><div class="t">'+esc(x.titulo)+'</div><div class="s">semana de '+dlab(x.sem)+(x.parcial?' · falta parte':'')+'</div></div><div class="v">'+c2s(x.resta+((x.multaInfo&&x.multaInfo.restaMulta)||0))+'</div><button class="okb" aria-label="Recebi" onclick="event.stopPropagation();receberSemana(\''+x.id+'\',\''+x.sem+'\');fechar()">✓</button></div>'}).join('')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
-function vMais(){var h='';
+function vMais(){var h=window.PREVIA?'':'<div class="card tap" onclick="location.href=\'novo/\'" style="background:var(--blue2);box-shadow:none"><h2 style="color:var(--blue)">🧪 Testar o app novo</h2><div class="sub">O Financeiro refeito, em paralelo: usa uma cópia dos seus dados e não mexe em nada deste app. Dá para voltar quando quiser.</div></div>';
  h+='<div class="card"><h2>Contas (bancos)</h2>';viv(S.contas).forEach(function(c){var s=saldoConta(c);h+='<div class="row tap" onclick="abrirConta(\''+c.id+'\')"><div class="bub">🏦</div><div class="g"><div class="t">'+esc(c.nome)+'</div><div class="s">'+(c.saldoIni==null?'saldo não informado':'saldo informado em '+dlab(c.dataIni))+'</div></div><div class="v">'+(s==null?'<span class="warnc">informar</span>':c2s(s))+'</div></div>'});
  h+='<button class="btn sm sec" onclick="abrirConta()">+ Conta</button><button class="btn sm sec" onclick="novaTransf()">Transferir entre contas</button></div>';
  h+='<div class="card tap" onclick="abrirConexao()"><h2>Gestão e Multas</h2><div style="display:flex;gap:11px;align-items:center"><div class="bub">🔗</div><div class="g"><div class="t" style="font-size:15.5px">'+(extChave()?'Conectado (só leitura)':'Não conectado')+'</div><div class="s sub">'+(extChave()?(EXT.em?'atualizado '+new Date(EXT.em).toLocaleString('pt-BR'):'aguardando a primeira leitura')+(EXT_ERRO?' · '+esc(EXT_ERRO):''):'Manutenções, documentos e multas dos seus carros')+'</div></div></div></div>';
