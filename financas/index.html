@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=63, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=64, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1701,7 +1701,7 @@ function importarArquivo(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)r
   if(!vazio()){try{localStorage.setItem(KEY+'_antes_import',JSON.stringify(S))}catch(e){}}
   delete d._ext;S=norm(d);migra();M=mesPadrao();save();render();toast('Dados carregados')}catch(e){toast('⚠️ '+e.message)}};r.readAsText(f)}
 /* ajustes únicos nos dados (não apaga nada) */
-function migra(){if(vazio())return;/* nunca grava por cima com o app vazio (protege a cópia interna) */var mud=false;if(!S.mig1){viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat==='Transporte'&&/posto|gasolina|etanol|combust|gnv|aleluia|osorio|tiririca|nossa senho/i.test(l.desc||'')){l.cat='Combustível';mud=true}});S.mig1=1;mud=true}if(mud)save()}
+function migra(){if(vazio())return;/* nunca grava por cima com o app vazio (protege a cópia interna) */var mud=false;if(!S.classDesde){S.classDesde=window.__CLASS_DESDE||Date.now();mud=true}if(!S.mig1){viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat==='Transporte'&&/posto|gasolina|etanol|combust|gnv|aleluia|osorio|tiririca|nossa senho/i.test(l.desc||'')){l.cat='Combustível';mud=true}});S.mig1=1;mud=true}if(mud)save()}
 function mesPadrao(){var m=ymOf(hoje());return S.inicio>m?S.inicio:m}
 
 /* =====================================================================
@@ -1940,7 +1940,7 @@ function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas);
    compra do pai não precisa de categoria, lançar enxuto como o da namorada
    ===================================================================== */
 /* gasto do pai no seu cartão: ele devolve — não precisa de categoria */
-function precisaClass(l){return l&&!l.del&&l.tipo==='gasto'&&l.de!=='pai'&&(!l.cat||l.cat==='A classificar'||!String(l.desc||'').trim())}
+function precisaClass(l){return l&&!l.del&&l.tipo==='gasto'&&l.de!=='pai'&&(l.criado||0)>=(S.classDesde||0)&&(!l.cat||l.cat==='A classificar'||!String(l.desc||'').trim())}
 /* quanto falta: hoje · amanhã · faltam 15 dias · venceu há 3 dias */
 function faltaTxt(d,receber){var n=diffD(hoje(),d);if(n===0)return 'hoje';if(n===1)return 'amanhã';if(n>1)return 'faltam '+n+' dias';if(n===-1)return receber?'atrasado desde ontem':'venceu ontem';return (receber?'atrasado há ':'venceu há ')+(-n)+' dias'}
 function diaLongo(d){var t=hoje(),w=pd(d).getDay(),n=DS[w];n=n.charAt(0).toUpperCase()+n.slice(1)+(w>=1&&w<=5?'-feira':'');return (d===t?'Hoje · ':d===addD(t,-1)?'Ontem · ':'')+n+', '+(+d.slice(8,10))+' de '+MESES[+d.slice(5,7)-1]}
@@ -2022,11 +2022,15 @@ nuSalvar=function(){if(!NU||!NU.edit)return _nuSalvarN();nuLer();var n=NU,l=porI
    Dinheiro de verdade (caixa): reembolso do pai não é entrada, a parte dele na fatura não é saída, empréstimo não é renda,
    compra no cartão sai quando você paga a fatura. Embaixo, o previsto do mês inteiro (o mesmo da Agenda). ===== */
 function mesSo0(ym){return MESES[+ym.slice(5,7)-1]}
-function resumoReal(ym){var it=itensMes(ym),ent=0,sai=0;
- it.forEach(function(x){if(x.kind==='reemb'||x.status==='parado'||x.status==='adiantado'||x.status==='cartao')return;
-  if(x.kind==='lanc'&&(/dívida/.test(x.titulo)||x.titulo==='Ajuste de saldo'))return;
-  if(x.sinal>0){var r=x.status==='adiado'?((x.multaInfo&&x.multaInfo.rec)||0):Math.max(0,(x.valor||0)-(x.resta||0));ent+=r}
-  else if(x.sinal<0)sai+=Math.max(0,suaV(x)-suaR(x))});
+function resumoReal(ym){var ent=0,sai=0,it=itensMes(ym);
+ /* dinheiro de verdade, pelo dia em que entrou/saiu: reembolso do pai, empréstimo, transferência e ajuste de saldo não contam;
+    compra no cartão sai quando você paga a fatura; da fatura paga, só a SUA parte (a do pai ele devolve) */
+ viv(S.lanc).forEach(function(l){if(ymOf(l.data)!==ym)return;
+  if(l.tipo==='entrada'||l.tipo==='recavulsa')ent+=l.valor||0;
+  else if(l.tipo==='gasto'){if(!ehCartao(l.meio))sai+=l.valor||0}
+  else if(l.tipo==='pagfixa'||l.tipo==='pagavulsa')sai+=l.valor||0;
+  else if(l.tipo==='pagfatura'){var q=String(l.ref||'').split('|'),f=q.length===2?fatura(q[0],q[1]):null,sh=f&&f.valor>0?Math.min(1,Math.max(0,f.pai/f.valor)):0;sai+=Math.round((l.valor||0)*(1-sh))}});
+ viv(S.carros).forEach(function(car){docsPagosMes(car,ym).forEach(function(o){sai+=o.valor||0})});
  var r=resumoMes(ym),pe=r.seguro,ps=r.pagar-paiNasFaturas(it);return {ent:ent,sai:sai,sob:ent-sai,pe:pe,ps:ps,psob:pe-ps}}
 function resumoHoje(){var ym=ymOf(hoje()),r=resumoReal(ym),pos=r.sob>=0;
  return '<div class="sec"><div class="sech"><span>'+capM(ym)+' até hoje</span><a onclick="AG=\'tudo\';go(\'agenda\')">ver mês ›</a></div>'+
@@ -2208,8 +2212,9 @@ html.af.afKb body{bottom:auto!important;height:var(--afVvh,100vh)!important}
 html.af.afKb #tabs{display:none!important}
 html.af body::before{content:'';position:absolute;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30;pointer-events:none}
 /* Hudson 14/11: nada aparece por baixo/ao redor da barra flutuante — o fundo do app cobre essa faixa */
-html.af body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:calc(env(safe-area-inset-bottom,0px) + 98px);background:linear-gradient(to bottom,transparent 0,var(--bg) 26px,var(--bg) 100%);z-index:19;pointer-events:none}
-html.af.afKb body::after,html.tecladoAberto body::after{display:none}
+/* Hudson 14/11 (3ª vez): a área que rola TERMINA acima da barra — a lista nunca passa por baixo nem aparece em volta dela */
+html.af #afScroll{flex:0 1 auto!important;height:calc(100% - env(safe-area-inset-bottom,0px) - 86px)!important;padding-bottom:18px!important}
+html.af.afKb #afScroll,html.tecladoAberto #afScroll{height:100%!important}
 </style>
 <script id="afJs">
 (function(){
