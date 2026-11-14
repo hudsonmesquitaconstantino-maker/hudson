@@ -145,7 +145,7 @@ html.teclado #tabs,html.teclado #fab{display:none}
    combinada (às vezes pagos em partes) e Pix avulsos. Os dados ficam no aparelho e, com a chave,
    na nuvem protegida — o código não tem nenhum dado pessoal.
    ===================================================================== */
-var APP_VER=5,APP_DATE='13/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
+var APP_VER=6,APP_DATE='14/11/2026',KEY='nam_estado_v1',KEYK='nam_chave';
 var FB_CFG={apiKey:"AIzaSyCOFRrTkOF0s3fs4-43IyO1NNVpBscRquw",authDomain:"guimas-73e01.firebaseapp.com",databaseURL:"https://guimas-73e01-default-rtdb.firebaseio.com",projectId:"guimas-73e01"};
 
 /* ---------- utilidades ---------- */
@@ -315,11 +315,12 @@ function vInicio(){var t=hoje(),h='';
  /* aperto */
  if(p.saldo!=null){var p45=projecao(addD(t,45)),ap=p45.outs.filter(function(o){return o.saldo<0})[0];
   if(ap)h+='<div class="card" style="border:1.5px solid var(--coral2)"><div class="kv" style="padding:0"><div><div class="sub" style="font-weight:800;color:var(--coral)">Atenção: vai faltar dinheiro</div><div style="font-weight:800;font-size:16px;margin-top:2px">'+esc(ap.x.titulo)+'</div><div class="sub">'+dlab(ap.dia)+' · '+quando(ap.dia)+'</div></div><div style="text-align:right"><div class="sub">faltam</div><b class="neg" style="font-size:20px">'+c2s(-ap.saldo)+'</b></div></div>'+(ap.inc>0?'<div class="sub" style="margin-top:8px">Se o incerto até lá entrar ('+c2s(ap.inc)+'), '+(ap.saldo+ap.inc>=0?'dá e sobra '+c2s(ap.saldo+ap.inc):'ainda faltam '+c2s(-(ap.saldo+ap.inc)))+'.</div>':'')+'</div>'}
- /* a receber e a pagar (atrasados + próximos 10 dias) */
- var lim=addD(t,10),its=[];[addM(ymOf(t),-2),addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<inicio())return;its=its.concat(itensMes(ym))});
+ /* a receber e a pagar: atrasados + o mês inteiro (no fim do mês, também os próximos 10 dias) */
+ var fimM=diaNoMes(ymOf(t),31),lim=fimM>addD(t,10)?fimM:addD(t,10),its=[];[addM(ymOf(t),-2),addM(ymOf(t),-1),ymOf(t),addM(ymOf(t),1)].forEach(function(ym){if(ym<inicio())return;its=its.concat(itensMes(ym))});
  var rec=its.filter(function(x){return x.sinal>0&&x.resta>0&&x.data<=lim}).sort(function(a,b){return a.data<b.data?-1:1}),pag=its.filter(function(x){return x.sinal<0&&x.resta>0&&x.data<=lim}).sort(function(a,b){return a.data<b.data?-1:1});
- h+='<div class="card"><h2>Para receber</h2>'+(rec.length?rec.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nada para receber nos próximos 10 dias.</div>')+'<button class="btn sm sec" onclick="go(\'receber\')">Ver tudo a receber ›</button></div>';
- h+='<div class="card"><h2>Para pagar</h2>'+(pag.length?pag.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nenhuma conta nos próximos 10 dias. 🌿</div>')+'</div>';
+ var _tr=rec.reduce(function(s,x){return s+(x.cert==='incerta'?0:x.resta)},0),_tp=pag.reduce(function(s,x){return s+x.resta},0),_hd=function(n,v){return '<div class="kv" style="padding:0;align-items:baseline"><h2>'+n+'</h2>'+(v>0?'<b style="font-size:16px">'+c2s(v)+'</b>':'')+'</div>'};
+ h+='<div class="card">'+_hd('Para receber',_tr)+(rec.length?rec.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nada para receber neste mês.</div>')+'<button class="btn sm sec" onclick="go(\'receber\')">Ver tudo a receber ›</button></div>';
+ h+='<div class="card">'+_hd('Para pagar',_tp)+(pag.length?pag.map(function(x){return linhaItem(x,true)}).join(''):'<div class="empty">Nenhuma conta a pagar neste mês. 🌿</div>')+'</div>';
  h+=cardsGrupos()+cardClassificar();
  /* gastos do mês (resumo) */
  var g=gastosMes(ymOf(t));if(g.tot>0){var ks=Object.keys(g.cat).sort(function(a,b){return g.cat[b]-g.cat[a]}).slice(0,3);
