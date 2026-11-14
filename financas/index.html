@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=54, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=55, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1259,7 +1259,7 @@ function filho(fn,a,b){var sh=document.getElementById('sheet');PILHA.push({fn:fu
 function abrir(h){var sh=document.getElementById('sheet'),ov=document.getElementById('ov');if(!ov.classList.contains('open'))PILHA=[];sh.style.transform='';sh.innerHTML='<div class="grabArea"><div class="grab"></div></div>'+h;if(!ov.classList.contains('open'))folhaTrava(true);ov.classList.add('open');sh.scrollTop=0;
  if(PILHA.length)[].forEach.call(sh.querySelectorAll('button.btn.sec'),function(b){if(/^(Fechar|Cancelar)$/.test(b.textContent.trim()))b.textContent='‹ Voltar'})}
 function fecharTudo(){PILHA=[];fechar()}
-function fechar(){var ov=document.getElementById('ov');if(!ov.classList.contains('open'))return;
+function fechar(){var ov=document.getElementById('ov');try{var ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur()}catch(e){}if(!ov.classList.contains('open'))return;
  if(PILHA.length){var p=PILHA.pop(),sh0=document.getElementById('sheet');try{p.fn()}catch(e){PILHA=[];return fechar()}sh0.scrollTop=p.top;return}ov.classList.remove('open');var sh=document.getElementById('sheet');sh.innerHTML='';sh.style.transform='';folhaTrava(false)}
 /* ---------- janela de baixo (lançar, editar…) firme no iPhone — Hudson 02/11/2026 ----------
    • a página de trás não rola nem "puxa" junto quando você arrasta dentro da janela;
@@ -1748,7 +1748,7 @@ function nomeMeioCurto(id){var c=conta(id);if(c)return 'Pix · '+c.nome;var k=ca
 
 /* ---------- o "+" novo: escreve o nome e o resto se arruma sozinho ---------- */
 function novoUnico(){if(precisaConta())return;var mu=(S.ultMeio&&(conta(S.ultMeio)||cartao(S.ultMeio))&&!(conta(S.ultMeio)||cartao(S.ultMeio)).del)?S.ultMeio:contaPadrao();
- NU={tipo:'out',desc:'',valor:null,data:hoje(),feito:true,carro:'',meio:mu,meioBase:mu,parc:1,de:'eu',cat:'',catMan:false,meioMan:false,deMan:false,carroMan:false,verCats:false,pal:null};nuDesenha();setTimeout(function(){var e=document.getElementById('nuDesc');if(e)e.focus()},350)}
+ NU={tipo:'out',desc:'',valor:null,data:hoje(),feito:true,carro:'',meio:mu,meioBase:mu,parc:1,de:'eu',cat:'',catMan:false,meioMan:false,deMan:false,carroMan:false,verCats:false,pal:null};nuDesenha()}
 function nuSet(k,v){nuLer();NU[k]=v;if(k==='cat')NU.catMan=true;if(k==='meio')NU.meioMan=true;if(k==='de')NU.deMan=true;if(k==='carro')NU.carroMan=true;
  if(k==='tipo'){NU.pal=null;nuAplica(true);if(v==='in'&&ehCartao(NU.meio))NU.meio=contaPadrao()}nuDesenha()}
 /* aplica o palpite no que você ainda não escolheu à mão */
@@ -2160,6 +2160,7 @@ html.af.ovOn #afScroll{overflow:hidden!important}
 html.af body>.afFix{position:absolute!important}
 html.af.afKb body{bottom:auto!important;height:var(--afVvh,100vh)!important}
 html.af.afKb #tabs{display:none!important}
+html.af body::before{content:'';position:absolute;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30;pointer-events:none}
 </style>
 <script id="afJs">
 (function(){
@@ -2186,7 +2187,7 @@ html.af.afKb #tabs{display:none!important}
  var vv=window.visualViewport,foco=false,aberto=false,raf=0,base=window.innerHeight;
  var toque=false;try{toque=window.matchMedia('(pointer:coarse)').matches||('ontouchstart' in window)}catch(e){}
  function campo(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|email|url|number|password|)$/i.test(el.type||''))||!!el.isContentEditable)&&!el.readOnly&&!el.disabled}
- function aplicar(){raf=0;if(!foco||window.innerHeight>base)base=Math.max(window.innerHeight,foco?base:0);
+ function aplicar(){raf=0;if(foco&&!(campo(document.activeElement)&&document.documentElement.contains(document.activeElement)))foco=false;if(!foco||window.innerHeight>base)base=Math.max(window.innerHeight,foco?base:0);
   var h=vv?vv.height:window.innerHeight,kb=vv?Math.max(0,base-vv.height,window.innerHeight-vv.height):0,agora=foco&&(toque||kb>120||!vv)||kb>150;
   var v=Math.round(h)+'px';if(v!==de._afv){de._afv=v;de.style.setProperty('--afVvh',v)}
   if(agora!==aberto){aberto=agora;de.classList.toggle('afKb',agora)}}
@@ -2195,6 +2196,8 @@ html.af.afKb #tabs{display:none!important}
  window.addEventListener('resize',agenda);window.addEventListener('orientationchange',function(){base=0;setTimeout(agenda,400)});
  document.addEventListener('focusin',function(e){if(campo(e.target)){foco=true;agenda();setTimeout(agenda,250)}},true);
  document.addEventListener('focusout',function(){setTimeout(function(){foco=campo(document.activeElement);agenda();setTimeout(agenda,300)},80)},true);
+ document.addEventListener('touchstart',function(){if(aberto&&!campo(document.activeElement)){foco=false;agenda()}},true);
+ setInterval(function(){if(aberto&&!campo(document.activeElement)){foco=false;agenda()}},700);
  aplicar();
 })();
 </script>
