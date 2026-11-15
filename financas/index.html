@@ -230,7 +230,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=67, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=68, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -301,7 +301,16 @@ function faturaDe(c,d){
 }
 function parcV(v,n,i){var b=Math.floor(v/n);return i===0?v-b*(n-1):b}
 /* conta fixa de um carro excluído no Gestão (vendido): vale até o mês em que saiu e depois some (Hudson 03/11: seguro do Fiesta paga dia 5 e acabou). Financiamento NÃO some sozinho: dívida continua até você encerrar. */
-function fixaVigente(f,ym){if(f.del||(f.inicio&&f.inicio>ym)||(f.fim&&ym>f.fim))return false;if(f.carro&&f.cat!=='Financiamentos'&&!/financ/i.test(f.nome||'')){var c=carro(f.carro),ex=c&&excluidoEm(c);if(ex&&ym>ymOf(ex))return false}return true}
+/* Hudson 15/11: EXCLUIR NUNCA APAGA O PASSADO. Conta fixa excluída continua nos meses em que foi paga
+   (ou, no cartão, nas faturas que já venceram antes de excluir). Só "cadastrei por engano" apaga tudo. */
+function _ymdTs(ts){var d=new Date(ts);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function delDia(o){if(o.delEm)return o.delEm;var h=(o.hist||[]).filter(function(e){return e.prev&&Object.prototype.hasOwnProperty.call(e.prev,'del')});var at=h.length?h[h.length-1].at:o.at;return at?_ymdTs(at):hoje()}
+function fixaPagaNoMes(f,ym){var k=f.id+'|'+ym;return viv(S.lanc).some(function(l){return l.tipo==='pagfixa'&&l.ref===k})}
+function fixasHist(){return (S.fixas||[]).filter(function(f){return f&&(!f.del||f.delModo!=='engano')})}
+function fixaVigente(f,ym){if(f&&f.del){if(f.delModo==='engano')return false;if(!_fixaVig0(Object.assign({},f,{del:false}),ym))return false;if(fixaPagaNoMes(f,ym))return true;
+  var c=ehCartao(f.meio)?cartao(f.meio):null;if(!c)return false;var dt=diaNoMes(ym,f.dia||1);return diaNoMes(faturaDe(c,dt),+c.vence||1)<delDia(f)}
+ return _fixaVig0(f,ym)}
+function _fixaVig0(f,ym){if(f.del||(f.inicio&&f.inicio>ym)||(f.fim&&ym>f.fim))return false;if(f.carro&&f.cat!=='Financiamentos'&&!/financ/i.test(f.nome||'')){var c=carro(f.carro),ex=c&&excluidoEm(c);if(ex&&ym>ymOf(ex))return false}return true}
 function valorFixa(f,ym){var o=S.fixasMes[f.id+'|'+ym];if(o&&o.apagada)return 0;return o&&o.valor!=null?o.valor:(f.valor||0)}
 /* Hudson 11/11: apagar uma cobrança/conta só daquela semana ou mês (não vai receber/pagar). Some das contas; dá para voltar. */
 function valorRenda(r,s){var a=semAj(r.id,s);return a.valor!=null?a.valor:(r.valor||0)}
@@ -311,7 +320,7 @@ function itensFatura(cid,ym){
   /* compra que veio da fatura do banco: parcela parcIni cai na fatura l.fat, cada uma com o valor exato do banco */
   if(l.fat){var k0=Math.max(1,+l.parcIni||1);for(var q=k0;q<=n;q++)if(addM(l.fat,q-k0)===ym)out.push({kind:'lanc',l:l,v:l.vParc,i:q,n:n,pai:l.de==='pai',data:l.data,nome:l.desc||l.cat||'Compra'});return}
   for(var i=0;i<n;i++)if(addM(base,i)===ym)out.push({kind:'lanc',l:l,v:parcV(l.valor,n,i),i:i+1,n:n,pai:l.de==='pai',data:l.data,nome:l.desc||l.cat||'Compra'})});
- viv(S.fixas).forEach(function(f){if(f.meio!==cid)return;for(var k=-2;k<=1;k++){var mm=addM(ym,k);if(!fixaVigente(f,mm)||(S.fixasMes[f.id+'|'+mm]||{}).apagada)continue;var dt=diaNoMes(mm,f.dia||1);
+ fixasHist().forEach(function(f){if(f.meio!==cid)return;for(var k=-2;k<=1;k++){var mm=addM(ym,k);if(!fixaVigente(f,mm)||(S.fixasMes[f.id+'|'+mm]||{}).apagada)continue;var dt=diaNoMes(mm,f.dia||1);
   if(faturaDe(c,dt)===ym)out.push({kind:'fixa',f:f,v:valorFixa(f,mm),pai:false,data:dt,nome:f.nome,mes:mm})}});
  out.sort(function(a,b){return a.data<b.data?-1:1});return out;
 }
@@ -391,14 +400,15 @@ function saldoTotal(){var cs=viv(S.contas);if(!cs.length)return null;var t=0;for
 function adiadaVazia(x){return x.kind==='carro'&&x.status==='adiado'&&!((x.multaInfo&&x.multaInfo.rec)>0)}
 function itensMes(ym){
  var t=hoje(),out=[],atras=function(d){return d<t&&ym>=S.inicio};
- viv(S.fixas).forEach(function(f){if(!fixaVigente(f,ym)||ehCartao(f.meio))return;var x=fixaMes(f,ym);
+ fixasHist().forEach(function(f){if(!fixaVigente(f,ym)||ehCartao(f.meio))return;var x=fixaMes(f,ym);
   if((S.fixasMes[x.k]||{}).apagada&&!x.pago){out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,sinal:-1,valor:0,resta:0,cert:'certo',titulo:f.nome,status:'parado',apagada:true});return}
   out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,semData:x.semData,sinal:-1,valor:x.valor,resta:x.resta,cert:'certo',titulo:f.nome,status:x.resta<=0?'pago':(atras(x.due)?'atrasado':'pendente')})});
  viv(S.cartoes).forEach(function(c){var x=fatura(c.id,ym);if(x.valor<=0&&!x.informado)return;
   out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor,resta:x.resta,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:x.resta<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:x.pai});
 });
  (function(){var cp=contaPai(ym);if(cp.total>0)out.push({kind:'reemb',id:'pai',ym:ym,data:cp.vence,sinal:1,valor:cp.total,resta:cp.resta,cert:'provavel',titulo:'Reembolso do seu pai (cartões)',status:cp.resta<=0?'pago':'pendente'})})();
- viv(S.carros).forEach(function(car){var ug=usaGestao(car);if(!ug&&!(car.semanal>0))return;semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){
+ (S.carros||[]).filter(Boolean).forEach(function(car){if(car.del){semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){var rs=recebSemana('carro',car.id,s);if(rs.length)out.push({kind:'carro',id:car.id,sem:s,data:s,sinal:1,valor:soma(rs,function(l){return l.valor}),resta:0,cert:'certo',titulo:car.nome,status:'pago',nota:'carro excluído · recebido'})});return}
+  var ug=usaGestao(car);if(!ug&&!(car.semanal>0))return;semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){
   var ex=excluidoEm(car);if(ex&&s>=ex&&!recebSemana('carro',car.id,s).length)return;
   var k=contaSemana(car,s);if(!k)return;var inf=k.inf;
   var base={kind:'carro',id:car.id,sem:s,data:k.aj.data||s,sinal:1,contrato:inf.contrato||inf.valor,titulo:car.nome,nota:(k.aj.valor!=null?'valor desta semana ajustado por você':inf.nota)||'',motorista:inf.motorista||'',devido:k.devido,pagoParc:k.pago,multaInfo:k};
@@ -411,12 +421,13 @@ function itensMes(ym){
   else{var cc=certCarro(car,inf,s);if(cc==='incerta'&&inf.encerrado)base.nota=(base.nota?base.nota+' · ':'')+'contrato encerrado'+(inf.fimCt&&(base.nota||'').indexOf(dcurto(inf.fimCt))<0?' em '+dcurto(inf.fimCt):'');
    out.push(Object.assign(base,{valor:k.devido+k.carry,resta:k.restaSem+k.carry,cert:cc,status:atras(k.aj.data||s)?'atrasado':'pendente',parcial:k.pago>0}))}
   if(k.multa>0)out.push({kind:'multa',id:car.id,sem:s,data:addD(s,Math.max(0,k.dias-1)),sinal:1,valor:k.multa,resta:k.restaMulta,cert:'incerta',titulo:car.nome+' · multa',nota:k.dias+' dia'+(k.dias>1?'s':'')+' × '+c2s(k.md),status:k.restaMulta<=0?'pago':(addD(s,4)<t?'atrasado':'pendente')})})});
- viv(S.rendas).forEach(function(r){if(!(r.valor>0))return;if(r.inicio&&r.inicio>ym)return;semanasDoMes(ym,r.diaSem==null?3:+r.diaSem).forEach(function(s){
-  var rs=recebSemana('renda',r.id,s),rec=soma(rs,function(l){return l.valor});
+ (S.rendas||[]).filter(Boolean).forEach(function(r){if(!(r.valor>0))return;if(r.inicio&&r.inicio>ym)return;semanasDoMes(ym,r.diaSem==null?3:+r.diaSem).forEach(function(s){
+  var rs=recebSemana('renda',r.id,s),rec=soma(rs,function(l){return l.valor});if(r.del&&!rs.length)return;
   out.push(rs.length?{kind:'renda',id:r.id,sem:s,data:s,sinal:1,valor:rec,resta:0,cert:'certo',titulo:r.nome,status:'pago'}
    :semAj(r.id,s).apagada?{kind:'renda',id:r.id,sem:s,data:s,sinal:1,valor:0,resta:0,cert:'certo',titulo:r.nome,status:'parado',apagada:true,nota:'apagada por você'}
    :(function(){var dr=semAj(r.id,s).data||s,vr=valorRenda(r,s);return {kind:'renda',id:r.id,sem:s,data:dr,sinal:1,valor:vr,resta:vr,cert:r.incerto?'incerta':'provavel',titulo:r.nome,status:atras(dr)?'atrasado':'pendente',nota:dr!==s?'combinado para '+dcurto(dr)+' (era '+dcurto(s)+')':''}})())})});
- viv(S.avulsas).forEach(function(a){if(ymOf(a.data)!==ym)return;var pags=viv(S.lanc).filter(function(l){return (l.tipo==='pagavulsa'||l.tipo==='recavulsa')&&l.ref===a.id}),pg=soma(pags,function(l){return l.valor});
+ (S.avulsas||[]).filter(Boolean).forEach(function(a){if(ymOf(a.data)!==ym)return;var pags=viv(S.lanc).filter(function(l){return (l.tipo==='pagavulsa'||l.tipo==='recavulsa')&&l.ref===a.id}),pg=soma(pags,function(l){return l.valor});
+  if(a.del){if(pg>0)out.push({kind:'avulsa',id:a.id,data:pags[0].data||a.data,sinal:a.receber?1:-1,valor:pg,resta:0,cert:'certo',titulo:a.desc,status:'pago',nota:'excluída · '+(a.receber?'recebido':'pago')});return}
   out.push({kind:'avulsa',id:a.id,data:a.data,sinal:a.receber?1:-1,valor:a.valor,resta:Math.max(0,a.valor-pg),cert:a.receber?(a.incerto?'incerta':'provavel'):'certo',titulo:a.desc,status:a.valor-pg<=0?'pago':(atras(a.data)?'atrasado':'pendente')})});
  /* movimentos já feitos que não pertencem a nenhum item acima (gastos à vista, outras entradas, reembolsos, empréstimos) */
  viv(S.lanc).forEach(function(l){if(ymOf(l.data)!==ym)return;
@@ -860,7 +871,7 @@ function catsMes(ym){var c={},pai=0;function add(k,v){if(!(v>0))return;c[k]=(c[k
   /* parte do pai = exatamente a da fatura (já arredondada, com o valor informado); o resto sem compra lançada = A classificar */
   pai+=x.pai;var resto=x.valor-id-x.pai;if(resto>0)add('A classificar',resto)});
  viv(S.lanc).forEach(function(l){if(ymOf(l.data)!==ym||l.tipo!=='gasto'||ehCartao(l.meio))return;add(l.cat||'Outros',l.valor)});
- viv(S.fixas).forEach(function(f){if(ehCartao(f.meio)||!fixaVigente(f,ym))return;add(f.cat||'Outros',valorFixa(f,ym))});
+ fixasHist().forEach(function(f){if(ehCartao(f.meio)||!fixaVigente(f,ym))return;add(f.cat||'Outros',valorFixa(f,ym))});
  viv(S.avulsas).forEach(function(a){if(a.receber||ymOf(a.data)!==ym)return;add(a.cat||sugCat(a.desc)||'Outros',a.valor)});
  viv(S.carros).forEach(function(car){docsPagosMes(car,ym).forEach(function(o){add('Multas e débitos',o.valor)})});
  return {c:c,pai:pai}}
@@ -975,7 +986,7 @@ function contaCarro(car,ym){var it=itensMes(ym),ws=it.filter(function(x){return 
  var _adR=function(x){return (x.multaInfo&&x.multaInfo.rec)||0}; /* semana que passou para outra: conta só o que entrou nela (o resto já está na semana seguinte — antes contava 2 vezes) */
  var contrato=soma(ws.filter(function(x){return x.status!=='parado'&&x.status!=='adiantado'}),function(x){return x.status==='adiado'?_adR(x):x.status==='pago'?x.contrato:x.valor}),rec=soma(ws.filter(function(x){return x.status==='pago'||x.status==='adiado'}),function(x){return x.status==='adiado'?_adR(x):x.valor});
  var abat=soma(viv(S.lanc).filter(function(l){return l.fonte==='carro'&&l.fid===car.id&&ymOf(l.semana||l.data)===ym}),function(l){return l.abat||0});
- var custos=viv(S.fixas).filter(function(f){return f.carro===car.id&&fixaVigente(f,ym)}),cst=soma(custos,function(f){return valorFixa(f,ym)});
+ var custos=fixasHist().filter(function(f){return f.carro===car.id&&fixaVigente(f,ym)}),cst=soma(custos,function(f){return valorFixa(f,ym)});
  var man=extManut(car,ym).mes,manSua=soma(man,function(m){return m.sua}),manConsid=Math.max(0,manSua-abat);
  var docs=docsPagosMes(car,ym),docT=soma(docs,function(o){return o.valor});
  var ext0=viv(S.lanc).filter(function(l){return l.carro===car.id&&ymOf(l.data)===ym&&(l.tipo==='entrada'||l.tipo==='gasto'||l.tipo==='recavulsa'||l.tipo==='pagavulsa')}),
@@ -1406,7 +1417,14 @@ function salvarFixa(id){var nome=val('xNome').trim(),v=dinheiro('xValor',true);i
 /* cancelou a assinatura: a última cobrança fica, as próximas somem */
 function cancelouFixa(id){var f=fixa(id),t=hoje(),ym=ymOf(t),dia=f.dia||1,fim=diaNoMes(ym,dia)<=t?ym:addM(ym,-1);
  editar(f,{fim:fim});save();fechar();render();toast(f.nome+': última cobrança em '+mesNome(fim).split(' ')[0]+'. Não entra mais nas próximas faturas.')}
-function excluirFixa(id){if(!confirm('Excluir esta conta fixa? Os pagamentos já registrados continuam.'))return;editar(fixa(id),{del:true});save();fechar();render()}
+function excluirFixa(id){var f=fixa(id),t=hoje(),ym=ymOf(t),x=fixaMes(f,ym),fimM=(x.due<=t||x.pago>0)?ym:addM(ym,-1);
+ abrir('<div class="lhead"><h3>Excluir '+esc(f.nome)+'?</h3></div><div class="sub" style="margin:4px 0 14px">O que já foi pago (ou já caiu na fatura) <b>nunca</b> sai do histórico.</div>'+
+  '<button class="btn" onclick="fixaParou(\''+id+'\',\''+fimM+'\')">Parou de vir · última em '+esc(mesNome(fimM).split(' ')[0])+'</button><div class="sub" style="text-align:center;margin:-2px 0 12px">Some dos próximos meses. Os meses passados continuam iguais.</div>'+
+  (fimM!==ym?'<button class="btn sec" onclick="fixaParou(\''+id+'\',\''+ym+'\')">Ainda vou pagar a de '+esc(mesNome(ym).split(' ')[0])+' · última em '+esc(mesNome(ym).split(' ')[0])+'</button>':'')+
+  '<button class="btn sec" style="color:var(--red)" onclick="fixaEngano(\''+id+'\')">Cadastrei por engano · apagar tudo</button><div class="sub" style="text-align:center;margin:-2px 0 12px">Sai também dos meses passados. Pagamentos registrados continuam no saldo.</div>'+
+  '<button class="btn sec" onclick="fechar()">Cancelar</button>')}
+function fixaParou(id,fimM){var f=fixa(id);editar(f,{fim:fimM});save();PILHA=[];fechar();render();toast(f.nome+': encerrada. Última em '+mesNome(fimM).split(' ')[0]+'; o histórico fica.')}
+function fixaEngano(id){var f=fixa(id);if(!confirm('Apagar "'+f.nome+'" de todos os meses?'))return;editar(f,{del:true,delModo:'engano',delEm:hoje()});save();PILHA=[];fechar();render();toast('Conta fixa apagada')}
 function abrirFixaMes(id,ym){var f=fixa(id),x=fixaMes(f,ym),o=S.fixasMes[x.k];if(o&&o.apagada&&!x.pago)return abrirApagada('fixa',id,ym);
  var h='<h3>'+esc(f.nome)+' · '+mesNome(ym)+'</h3><div class="sub">Vence '+(f.dia?dlab(x.due):'(dia a confirmar)')+'</div>';
  h+='<div class="card" style="margin-top:10px"><div class="kv"><span>Valor deste mês</span><b style="font-size:19px">'+c2s(x.valor)+'</b></div>'+(o&&o.valor!=null?'<div class="sub">editado para este mês · de sempre '+c2s(f.valor)+'</div>':'')+
@@ -1438,14 +1456,14 @@ function salvarCarro(id){var nome=val('rNome').trim();if(!nome){toast('Dê um no
  var ab=paradaAberta(c),querParado=_sitP==null?!!ab:!!_sitP,ini=val('rParIni')||null;
  if(querParado&&!ab)c.paradas.push({id:uid(),ini:ini,fim:null,at:Date.now()});else if(querParado&&ab&&ini!==ab.ini)editar(ab,{ini:ini});else if(!querParado&&ab)editar(ab,{fim:addD(hoje(),-1)});
  _sitP=null;save();fechar();render();toast('Carro salvo');if(p.gpk&&extChave())setTimeout(function(){extSync(false)},300)}
-function excluirCarro(id){if(!confirm('Excluir este carro? Os recebimentos já lançados continuam.'))return;editar(carro(id),{del:true});save();fechar();render()}
+function excluirCarro(id){if(!confirm('Excluir este carro? Ele some dos próximos meses; o que já foi recebido continua no histórico.'))return;editar(carro(id),{del:true,delEm:hoje()});save();fechar();render()}
 function abrirRenda(id){var r=id?renda(id):null;
  abrir('<h3>'+(r?esc(r.nome):'Nova renda semanal')+'</h3>'+fTxt('nNome','Nome',r?r.nome:'','Ex.: Pagamento do meu pai')+fMoney('nVal','Valor por semana',r?r.valor:null)+fSel('nDs','Dia da semana',optDS(),r&&r.diaSem!=null?r.diaSem:3)+
   fSel('nInc','Essa entrada é',[['0','Provável'],['1','Incerta']],r&&r.incerto?'1':'0')+fTxt('nIni','Vale a partir de (mês)',r?r.inicio||'':'','AAAA-MM ou vazio')+
   '<p class="help">Aumento previsto (ex.: de R$ 400 para R$ 800 em dezembro) só entra quando acontecer: aí você edita o valor.</p><button class="btn" onclick="salvarRenda('+(r?"'"+r.id+"'":'null')+')">Salvar</button>'+(r?'<button class="btn red" onclick="excluirRenda(\''+r.id+'\')">Excluir</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
 function salvarRenda(id){var nome=val('nNome').trim(),v=dinheiro('nVal',true);if(!nome){toast('Dê um nome');return}if(v==null)return;var p={nome:nome,valor:v,diaSem:+val('nDs'),incerto:val('nInc')==='1',inicio:val('nIni').trim()||null,diaConfirmar:false},r=id?renda(id):null;
  if(!r)S.rendas.push(Object.assign({id:uid(),criado:Date.now()},p));else editar(r,p);save();fechar();render();toast('Renda salva')}
-function excluirRenda(id){if(!confirm('Excluir esta renda?'))return;editar(renda(id),{del:true});save();fechar();render()}
+function excluirRenda(id){if(!confirm('Excluir esta renda? Ela some das próximas semanas; o que já foi recebido continua no histórico.'))return;editar(renda(id),{del:true,delEm:hoje()});save();fechar();render()}
 function abrirSemana(kind,id,sem,form){if(kind==='carro')return abrirSemanaCarro(id,sem);var o=renda(id),rs=recebSemana(kind,id,sem),l=rs[0],contrato=valorRenda(o,sem);
  if(semAj(id,sem).apagada&&!rs.length)return abrirApagada('renda',id,sem);
  var h='<h3>'+esc(o.nome)+' · semana de '+dlab(sem)+'</h3><div class="sub">Valor combinado: '+c2s(contrato)+'</div>';
@@ -1537,7 +1555,7 @@ function salvarAvulsa(id){var d=val('aDesc').trim(),v=dinheiro('aVal',true),a=id
  var p={desc:d,valor:v,data:val('aData')||hoje(),incerto:val('aInc')==='1',cat:val('aCat'),carro:val('aCarro')||null,receber:_avR==null?!!(a&&a.receber):!!_avR};_avR=null;
  if(!a)S.avulsas.push(Object.assign({id:uid(),criado:Date.now()},p));else editar(a,p);save();fechar();render();toast('Salvo')}
 function quitarAvulsa(id){var a=porId(S.avulsas,id),v=dinheiro('aPag',true);if(v==null)return;S.lanc.push({id:uid(),tipo:a.receber?'recavulsa':'pagavulsa',ref:id,valor:v,meio:val('aConta'),data:val('aDt')||hoje(),desc:a.desc,carro:a.carro||null,criado:Date.now(),at:Date.now()});save();abrirAvulsa(id);render();toast('Registrado')}
-function excluirAvulsa(id){if(!confirm('Excluir esta conta avulsa?'))return;editar(porId(S.avulsas,id),{del:true});save();fechar();render()}
+function excluirAvulsa(id){if(!confirm('Excluir esta conta avulsa? O que já foi pago ou recebido continua no histórico.'))return;editar(porId(S.avulsas,id),{del:true,delEm:hoje()});save();fechar();render()}
 
 /* lançamento rápido */
 var NL=null;
@@ -1962,8 +1980,8 @@ function linhaFixa(f,ym,ativa){var x=fixaMes(f,ym),o=S.fixasMes[x.k]||{},car=f.c
  if(car)sub.push(esc(car.nome.split(' ')[0]));
  var mud=ativa&&!o.apagada&&o.valor!=null&&o.valor!==f.valor;
  return '<div class="rn tap'+(!ativa||o.apagada?' muted':'')+'" onclick="'+(!ativa?"abrirFixa('"+f.id+"')":k?"abrirFixaMes('"+f.id+"','"+ym+"')":"abrirUni('fixa','"+f.id+"','"+ym+"')")+'"><div class="bub out">'+icCat(f.cat)+'</div><div class="g"><div class="t">'+esc(f.nome)+'</div><div class="s">'+sub.join(' · ')+' · '+st+'</div></div><div class="v">'+c2s(ativa&&!o.apagada?x.valor:f.valor)+(mud?'<div class="sub" style="font-size:11.5px;font-weight:500">de sempre '+c2s(f.valor)+'</div>':'')+'</div></div>'}
-function vFixas(){var ym=M,fs=viv(S.fixas).slice().sort(function(a,b){return (a.dia||99)-(b.dia||99)||String(a.nome).localeCompare(String(b.nome))});
- var vig=fs.filter(function(f){return fixaVigente(f,ym)}),fut=fs.filter(function(f){return !fixaVigente(f,ym)&&f.inicio&&f.inicio>ym}),fim=fs.filter(function(f){return !fixaVigente(f,ym)&&!(f.inicio&&f.inicio>ym)});
+function vFixas(){var ym=M,fs=fixasHist().slice().sort(function(a,b){return (a.dia||99)-(b.dia||99)||String(a.nome).localeCompare(String(b.nome))});
+ var vig=fs.filter(function(f){return fixaVigente(f,ym)}),fut=fs.filter(function(f){return !f.del&&!fixaVigente(f,ym)&&f.inicio&&f.inicio>ym}),fim=fs.filter(function(f){return !f.del&&!fixaVigente(f,ym)&&!(f.inicio&&f.inicio>ym)});
  var bol=vig.filter(function(f){return !ehCartao(f.meio)}),car=vig.filter(function(f){return ehCartao(f.meio)});
  var tB=soma(bol,function(f){return valorFixa(f,ym)}),tC=soma(car,function(f){return valorFixa(f,ym)}),pago=soma(bol,function(f){return Math.min(fixaMes(f,ym).pago,valorFixa(f,ym))}),falta=Math.max(0,tB-pago);
  var h=mnav();
@@ -2252,7 +2270,7 @@ function catItens(cat,ym){var out=[];
   var v=i.v;if(i.pai){var ar=arredPai(i.v);if(!(i.v>ar))return;v=i.v-ar}
   out.push({data:i.data,nome:i.nome,v:v,onde:'cartão '+cc.nome+(i.n>1?' · parcela '+i.i+'/'+i.n:''),lid:i.kind==='lanc'?i.l.id:'',fid:i.kind==='fixa'?i.f.id:''})})});
  viv(S.lanc).forEach(function(l){if(ymOf(l.data)!==ym||l.tipo!=='gasto'||ehCartao(l.meio)||(l.cat||'Outros')!==cat)return;var cn=conta(l.meio);out.push({data:l.data,nome:l.desc||l.cat||'Gasto',v:l.valor,onde:cn?'Pix · '+cn.nome:'Pix',lid:l.id})});
- viv(S.fixas).forEach(function(f){if(ehCartao(f.meio)||!fixaVigente(f,ym)||(f.cat||'Outros')!==cat)return;out.push({data:diaNoMes(ym,f.dia||1),nome:f.nome,v:valorFixa(f,ym),onde:'conta fixa',fid:f.id})});
+ fixasHist().forEach(function(f){if(ehCartao(f.meio)||!fixaVigente(f,ym)||(f.cat||'Outros')!==cat)return;out.push({data:diaNoMes(ym,f.dia||1),nome:f.nome,v:valorFixa(f,ym),onde:'conta fixa',fid:f.id})});
  viv(S.avulsas).forEach(function(a){if(a.receber||ymOf(a.data)!==ym||(a.cat||sugCat(a.desc)||'Outros')!==cat)return;out.push({data:a.data,nome:a.desc,v:a.valor,onde:'conta avulsa',aid:a.id})});
  out.sort(function(a,b){return a.data<b.data?1:-1});return out}
 function abrirCat(cat,ym){ym=ym||M;window._CATV={c:cat,ym:ym};var its=catItens(cat,ym),tot=soma(its,function(x){return x.v}),cm=catsMes(ym).c[cat]||0,resto=cm-tot;
