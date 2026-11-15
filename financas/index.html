@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=65, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=66, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -742,7 +742,7 @@ function nuSalvar(){nuLer();var n=NU,v=n.valor;if(v==null||v<=0){toast('Digite o
  if(!n.feito&&!card){var av={id:uid(),criado:t,desc:desc,valor:v,data:n.data,incerto:false,cat:saiu?cat:(/multa/i.test(desc)?'Multas e débitos':'Outros'),carro:car?car.id:null,receber:!saiu,orig:saiu?null:(/multa/i.test(desc)&&car?'multa':'outra'),agendado:true};
   S.avulsas.push(av);save();fechar();render();toast('📅 Agendado para '+dcurto(n.data)+' · não mexe no saldo');return}
  if(!saiu&&ehCartao(n.meio))n.meio=contaPadrao();
- var l={id:uid(),criado:t,at:t,tipo:saiu?'gasto':'entrada',valor:v,data:n.data,desc:desc,meio:n.meio,cat:cat,de:card?n.de:'eu',parc:card?(+n.parc||1):1,dest:null,ref:null,carro:car?car.id:null,orig:saiu?null:(/multa/i.test(desc)&&car?'multa':'outra')};
+ var l={id:uid(),criado:t,at:t,tipo:saiu?'gasto':'entrada',valor:v,data:n.data,desc:desc,meio:n.meio,cat:cat,de:card?n.de:'eu',parc:card?(+n.parc||1):1,dest:null,ref:null,carro:car?car.id:null,orig:saiu?null:(n.orig&&car?n.orig:(/multa/i.test(desc)&&car?'multa':'outra'))};if(saiu&&nuPedeGestao()&&n.foraGestao)l.foraGestao=true;
  S.lanc.push(l);if(saiu)S.ultMeio=n.meio;else S.ultConta=n.meio;save();fechar();render();
  if(card){var c=cartao(n.meio),ym=faturaDe(c,l.data);toastDesf(c.nome+': fatura de '+mesNome(ym).split(' ')[0]+(l.parc>1?' · '+l.parc+'x':''),{lanc:[l.id]})}else toastDesf((saiu?'Gasto: ':'Entrada: ')+c2s(v)+' · '+desc,{lanc:[l.id]})}
 
@@ -1388,7 +1388,7 @@ function pagarRapido(kind,id,ym,fora,quieto){var c=contaPadrao();if(!c&&!fora){p
 /* conta fixa */
 function abrirFixa(id){var f=id?fixa(id):null,meios=[['conta','Boleto ou débito em conta']].concat(viv(S.cartoes).map(function(c){return [c.id,'No cartão '+c.nome]}));
  abrir('<h3>'+(f?esc(f.nome):'Nova conta fixa')+'</h3>'+fTxt('xNome','Nome',f?f.nome:'','Ex.: Conta de luz')+fMoney('xValor','Valor de sempre',f?f.valor:null,'Se mudar num mês (luz, fatura…), edite só aquele mês na Agenda.')+
-  '<div class="two">'+fNum('xDia','Dia do vencimento',f?f.dia:'','vazio = a confirmar')+fSel('xCat','Categoria',CATS.map(function(c){return [c,c]}),f?f.cat:'Casa')+'</div>'+
+  '<div class="two">'+fNum('xDia','Dia do vencimento',f?f.dia:'','vazio = a confirmar')+fSel('xCat','Categoria',CATS.map(function(c){return [c,icCat(c)+' '+c]}),f?f.cat:'Casa')+'</div>'+
   fSel('xMeio','Como é paga',meios,f?(ehCartao(f.meio)?f.meio:'conta'):'conta','No cartão: entra dentro da fatura e não é somada de novo.')+fSel('xCarro','É de algum carro?',optCarros(),f?f.carro||'':'')+
   '<div class="two">'+fTxt('xIni','Começa em (mês)',f?f.inicio||'':ymOf(hoje()),'AAAA-MM')+fTxt('xFim','Termina em (mês)',f?f.fim||'':'','AAAA-MM ou vazio')+'</div>'+
   (f?(function(){var ms=Object.keys(S.fixasMes).filter(function(k){return k.indexOf(f.id+'|')===0&&S.fixasMes[k]&&S.fixasMes[k].apagada}).map(function(k){return k.slice(f.id.length+1)}).sort();
@@ -1521,7 +1521,7 @@ function salvarAjusteSemana(id,sem,volta){var key=id+'|'+sem,o=Object.assign({},
 /* contas avulsas */
 function abrirAvulsa(id){var a=id?porId(S.avulsas,id):null,pg=a?viv(S.lanc).filter(function(l){return l.ref===a.id&&(l.tipo==='pagavulsa'||l.tipo==='recavulsa')}):[];
  var h='<h3>'+(a?esc(a.desc):'Conta avulsa')+'</h3><div class="f"><div class="chips"><button id="aPg" class="'+(a&&a.receber?'':'on')+'" onclick="tipoAv(0)">A pagar</button><button id="aRc" class="'+(a&&a.receber?'on':'')+'" onclick="tipoAv(1)">A receber</button></div></div>'+
-  fTxt('aDesc','Descrição',a?a.desc:'','Ex.: Conserto do carro')+fMoney('aVal','Valor',a?a.valor:null)+fData('aData','Data',a?a.data:hoje())+fSel('aInc','Se for a receber, é',[['0','Provável'],['1','Incerta']],a&&a.incerto?'1':'0')+fSel('aCat','Categoria',CATS.map(function(c){return [c,c]}),a?a.cat:'Outros')+fSel('aCarro','É de qual carro (opcional)',[['','Nenhum']].concat(carrosAtivos().concat(a&&a.carro&&carro(a.carro)&&excluidoEm(carro(a.carro))?[carro(a.carro)]:[]).map(function(c){return [c.id,c.nome]})),a?(a.carro||''):'')+'<p class="help">Fica só na Agenda no dia escolhido. Não mexe no saldo até você tocar em Paguei ou Recebi. Se for de um carro, entra no resultado dele no mês em que acontecer.</p>'+
+  fTxt('aDesc','Descrição',a?a.desc:'','Ex.: Conserto do carro')+fMoney('aVal','Valor',a?a.valor:null)+fData('aData','Data',a?a.data:hoje())+fSel('aInc','Se for a receber, é',[['0','Provável'],['1','Incerta']],a&&a.incerto?'1':'0')+fSel('aCat','Categoria',CATS.map(function(c){return [c,icCat(c)+' '+c]}),a?a.cat:'Outros')+fSel('aCarro','É de qual carro (opcional)',[['','Nenhum']].concat(carrosAtivos().concat(a&&a.carro&&carro(a.carro)&&excluidoEm(carro(a.carro))?[carro(a.carro)]:[]).map(function(c){return [c.id,c.nome]})),a?(a.carro||''):'')+'<p class="help">Fica só na Agenda no dia escolhido. Não mexe no saldo até você tocar em Paguei ou Recebi. Se for de um carro, entra no resultado dele no mês em que acontecer.</p>'+
   '<button class="btn" onclick="salvarAvulsa('+(a?"'"+a.id+"'":'null')+')">Salvar</button>';
  if(a){var resta=a.valor-soma(pg,function(l){return l.valor});h=h.replace('</h3>','</h3>'+blocoPagar(a.receber?'avulsaRec':'avulsa',a.id,'',resta,a.receber?'':a.data,a.receber?'Recebi':'Paguei'));
   if(resta>0&&optContas().length)h+=maisOpcoes(fMoney('aPag',a.receber?'Recebido':'Pagar',resta)+fSel('aConta','Conta',optContas(),contaPadrao())+fData('aDt','Data',hoje())+'<button class="btn" onclick="quitarAvulsa(\''+a.id+'\')">'+(a.receber?'Registrar recebimento':'Marcar como pago')+'</button>',a.receber?'Outro valor ou outra data':undefined);
@@ -1605,13 +1605,13 @@ function infoCartao(){var c=cartao(NL.meio);if(!c)return '';var d=NL.data||hoje(
  return h+'</div>'}
 function formLanc(){var e=!!NL.id,sh=document.getElementById('sheet'),st=NL._re?sh.scrollTop:0;NL._re=0;
  var tipos=[['gasto','Gasto'],['entrada','Entrada'],['reembolso','Reembolso do pai'],['emprestimo','Empréstimo'],['transf','Transferência']];if(NL.tipo==='ajuste')tipos=[['ajuste','Ajuste de saldo']];
- var h='<h3>'+(e?'Editar':'Lançar')+'</h3>'+chipsHtml(tipos,NL.tipo,'nlTipo');
+ var TNOME={reembolso:'Reembolso do pai',emprestimo:'Empréstimo',transf:'Transferência',ajuste:'Ajuste de saldo'},h=TNOME[NL.tipo]?'<div class="lhead"><h3>'+(e?'Editar · ':'')+TNOME[NL.tipo]+'</h3></div>':'<h3>'+(e?'Editar':'Lançar')+'</h3>'+chipsHtml(tipos,NL.tipo,'nlTipo');
  h+=fMoney('lVal','Valor',NL.valor!=null?Math.abs(NL.valor):null).replace('onfocus="this.select()"','onfocus="this.select()" onchange="lerNL();if(ehCartao(NL.meio)){NL._re=1;formLanc()}"');
  if(NL.tipo==='gasto'){
   h+='<div class="f"><input id="lDesc" value="'+esc(NL.desc||'')+'" placeholder="O que foi? (ex.: açaí, gasolina)" oninput="descMudou(this.value)"></div>';
   var cs=catsUsadas(),top=NL.todasCats?cs:cs.slice(0,8);if(NL.cat&&top.indexOf(NL.cat)<0)top=[NL.cat].concat(top.slice(0,7));
-  h+='<div class="f"><div class="chips" id="lCats">'+top.map(function(c){return '<button data-c="'+esc(c)+'" class="'+(NL.cat===c?'on':'')+'" onclick="nlSet(\'cat\',\''+c+'\')">'+c+'</button>'}).join('')+(NL.todasCats?(NL.novaCat?'':'<button onclick="NL.novaCat=1;nlSet(\'x\',0)">+ Nova</button>'):'<button onclick="NL.todasCats=1;nlSet(\'x\',0)">mais…</button>')+'</div>'+(NL.novaCat?'<div style="display:flex;gap:8px;margin-top:8px"><input id="nlCatNova" placeholder="Nome da categoria" autocomplete="off" style="flex:1"><button class="btn sm" style="width:auto;margin:0" onclick="nlNovaCat()">Criar</button></div>':'')+'</div>';
-  var meios=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(viv(S.cartoes).map(function(c){return [c.id,c.nome]}));
+  h+='<div class="f"><div class="chips" id="lCats">'+top.map(function(c){return '<button data-c="'+esc(c)+'" class="'+(NL.cat===c?'on':'')+'" onclick="nlSet(\'cat\',\''+c+'\')">'+icCat(c)+' '+esc(c)+'</button>'}).join('')+(NL.todasCats?(NL.novaCat?'':'<button onclick="NL.novaCat=1;nlSet(\'x\',0)">+ Nova</button>'):'<button onclick="NL.todasCats=1;nlSet(\'x\',0)">mais…</button>')+'</div>'+(NL.novaCat?'<div style="display:flex;gap:8px;margin-top:8px"><input id="nlCatNova" placeholder="Nome da categoria" autocomplete="off" style="flex:1"><button class="btn sm" style="width:auto;margin:0" onclick="nlNovaCat()">Criar</button></div>':'')+'</div>';
+  var meios=viv(S.contas).map(function(c){return [c.id,viv(S.contas).length>1?'Pix · '+c.nome:'Pix / débito']}).concat(viv(S.cartoes).map(function(c){return [c.id,'💳 '+c.nome]}));
   h+='<div class="f"><label>Pagou com</label>'+chipsHtml(meios,NL.meio,'nlMeio')+'</div>';
   if(ehCartao(NL.meio)){h+='<div class="f"><div class="chips">'+[1,2,3,4,5,6,10,12].map(function(n){return '<button class="'+((+NL.parc||1)===n?'on':'')+'" onclick="nlSet(\'parc\','+n+')">'+(n===1?'À vista':n+'x')+'</button>'}).join('')+'<button class="'+(NL.de==='pai'?'on':'')+'" onclick="nlSet(\'de\',NL.de===\'pai\'?\'eu\':\'pai\')">É do pai</button></div></div>'+infoCartao()}
   h+=nlAgendado()?'':fixaChipHtml();
@@ -1665,7 +1665,7 @@ function nlMeio(m){nlSet('meio',m)}
 function nlCarro(c){nlSet('carro',c)}
 function nlOrig(o){nlSet('orig',o)}
 function descMudou(t){NL.desc=t;if(NL.catManual)return;var c=sugCat(t);if(!c||c===NL.cat)return;NL.cat=c;var box=document.getElementById('lCats');if(!box)return;
- var b=box.querySelector('button[data-c="'+c+'"]');if(!b){box.insertAdjacentHTML('afterbegin','<button data-c="'+esc(c)+'" onclick="nlSet(\'cat\',\''+c+'\')">'+c+'</button>');b=box.firstChild}
+ var b=box.querySelector('button[data-c="'+c+'"]');if(!b){box.insertAdjacentHTML('afterbegin','<button data-c="'+esc(c)+'" onclick="nlSet(\'cat\',\''+c+'\')">'+icCat(c)+' '+esc(c)+'</button>');b=box.firstChild}
  [].forEach.call(box.querySelectorAll('button'),function(x){x.classList.toggle('on',x===b)});
  var cb=document.getElementById('lCarroBox');if(cb)cb.style.display=(c==='Carros'||c==='Multas e débitos'||NL.carro)?'':'none'}
 function lerNL(){var v=parseBRL(val('lVal'));if(v!=null)NL.valor=v;if(document.getElementById('lData'))NL.data=val('lData');if(document.getElementById('lDesc'))NL.desc=val('lDesc');if(document.getElementById('lMeio'))NL.meio=val('lMeio');if(document.getElementById('lDest'))NL.dest=val('lDest');if(document.getElementById('lRef'))NL.ref=val('lRef')}
@@ -2028,12 +2028,12 @@ abrirLanc=function(id){var l=porId(S.lanc,id);if(l&&!_lancAntigo&&!l.del&&!l.fat
 function lancCompleto(id){_lancAntigo=1;try{_abrirLancOrig(id)}finally{_lancAntigo=0}}
 function editarUnico(l){var m=conta(l.meio)||cartao(l.meio);
  NU={id:l.id,edit:true,tipo:l.tipo==='entrada'?'in':'out',desc:l.desc||'',valor:l.valor,data:l.data,feito:true,carro:l.carro&&carro(l.carro)?l.carro:'',meio:m&&!m.del?l.meio:contaPadrao(),meioBase:l.meio,parc:+l.parc||1,de:l.de==='pai'?'pai':'eu',
-  cat:l.cat&&l.cat!=='A classificar'?l.cat:'',catMan:true,meioMan:true,deMan:true,carroMan:true,verCats:false,pal:null};nuDesenha()}
+  cat:l.cat&&l.cat!=='A classificar'?l.cat:'',catMan:true,meioMan:true,deMan:true,carroMan:true,verCats:false,pal:null,orig:l.orig||'',foraGestao:!!l.foraGestao};nuDesenha()}
 var _nuDesenhaN=nuDesenha;
 nuDesenha=function(){_nuDesenhaN();if(!NU||!NU.edit)return;var sh=document.getElementById('sheet');
  var h3=sh.querySelector('.lhead h3');if(h3)h3.textContent='Editar';
  var ch=[].filter.call(sh.querySelectorAll('.chips'),function(c){return /Ainda não \(agendar\)/.test(c.textContent)})[0];if(ch)ch.remove();
- var o=sh.querySelector('.outros');if(o)o.innerHTML='<a onclick="lancCompleto(\''+NU.id+'\')">Mais opções</a><a style="color:var(--red)" onclick="nuApagar()">Apagar</a>'};
+ var o=sh.querySelector('.outros');if(o)o.innerHTML='<a style="color:var(--red)" onclick="nuApagar()">Apagar este lançamento</a>'};
 var _nuPalN=nuPalHtml;nuPalHtml=function(){return NU&&NU.edit?'':_nuPalN()};
 function nuApagar(){var l=porId(S.lanc,NU&&NU.id);if(!l)return;if(!confirm('Apagar este lançamento?'))return;editar(l,{del:true});save();_memo=null;fechar();render();toast('Apagado')}
 var _nuSalvarN=nuSalvar;
@@ -2042,7 +2042,41 @@ nuSalvar=function(){if(!NU||!NU.edit)return _nuSalvarN();nuLer();var n=NU,l=porI
  var saiu=n.tipo==='out';if(!saiu&&!desc){toast('Escreva o que é');return}if(!saiu&&ehCartao(n.meio))n.meio=contaPadrao();
  var card=saiu&&ehCartao(n.meio),p={tipo:saiu?'gasto':'entrada',valor:v,data:n.data||l.data,desc:desc,meio:n.meio,cat:saiu?(n.cat||'A classificar'):null,de:card?n.de:'eu',parc:card?(+n.parc||1):1,carro:n.carro&&carro(n.carro)?n.carro:null};
  if(saiu!==(l.tipo==='gasto'))p.orig=saiu?null:(/multa/i.test(desc)&&p.carro?'multa':'outra');
+ if(!saiu&&n.orig)p.orig=n.orig;if(saiu)p.foraGestao=nuPedeGestao()?!!n.foraGestao:!!l.foraGestao;
  editar(l,p);save();_memo=null;fechar();render();toast('Salvo')};
+
+/* ===== Hudson 14/11 23:34: tudo no modelo novo =====
+   (a) carro no lançar/editar: de onde veio a entrada (multa, acerto) e se a manutenção vai pro Gestão
+   (b) compra que veio da fatura do banco: mesmo visual, nome editável, categorias com ícone, do pai, carro */
+function nuPedeGestao(){var n=NU,c=n&&n.carro?carro(n.carro):null;return !!(n&&n.tipo==='out'&&n.cat==='Carros'&&c&&c.gpk&&extChave())}
+var _nuCarroN=nuCarroHtml;
+nuCarroHtml=function(){var h=_nuCarroN(),n=NU;if(!h||!n||!n.carro)return h;
+ if(n.tipo==='in'){var os=[['multa','Multa do motorista'],['acerto','Acerto de manutenção'],['outra','Outra']];if(n.orig==='semanal')os.unshift(['semanal','Semanal']);var at=n.orig||(/multa/i.test(n.desc||'')?'multa':'outra');
+  h+='<label style="margin-top:10px">O que é esse dinheiro</label><div class="chips">'+os.map(function(o){return '<button class="'+(at===o[0]?'on':'')+'" onclick="nuSet(\'orig\',\''+o[0]+'\')">'+o[1]+'</button>'}).join('')+'</div>'}
+ else if(nuPedeGestao())h+='<label style="margin-top:10px">Essa manutenção está (ou vai) no Gestão?</label><div class="chips"><button class="'+(n.foraGestao?'':'on')+'" onclick="nuSet(\'foraGestao\',false)">Sim — não conta de novo</button><button class="'+(n.foraGestao?'on':'')+'" onclick="nuSet(\'foraGestao\',true)">Não vai pro Gestão</button></div>';
+ return h};
+var IMP=null;
+abrirImportada=function(l){IMP={id:l.id,desc:l.desc||'',cat:l.cat&&l.cat!=='A classificar'?l.cat:'',de:l.de==='pai'?'pai':'eu',carro:l.carro&&carro(l.carro)?l.carro:'',verCats:false};impDesenha()};
+function impLer(){if(!IMP)return;var e=document.getElementById('impDesc');if(e)IMP.desc=e.value;var c=document.getElementById('impCarro');if(c)IMP.carro=c.value}
+function impSet(k,v){impLer();IMP[k]=v;impDesenha()}
+function impDesenha(){var i=IMP,l=porId(S.lanc,i.id);if(!l||l.del)return fechar();var c=cartao(l.meio)||{},n=+l.parc||1,k0=+l.parcIni||1,t=hoje(),rest=0;
+ for(var q=k0;q<=n;q++)if(diaNoMes(addM(l.fat,q-k0),+c.vence||1)>=t)rest++;
+ var h='<div class="lhead"><h3>Editar compra</h3></div><div class="sub">💳 '+esc(c.nome||'')+' · compra de '+esc(dlab(l.data))+'</div>';
+ h+='<div class="f" style="margin-top:12px"><label>O que foi</label><input id="impDesc" autocomplete="off" autocapitalize="sentences" value="'+esc(i.desc)+'" placeholder="Nome da compra"></div>';
+ h+='<div class="card" style="margin:2px 0 14px"><div class="kv"><span>'+(n>1?'Parcela':'Valor')+'</span><b>'+c2s(l.vParc)+'</b></div>'+
+  (n>1?'<div class="kv"><span>Parcelas</span><b>'+k0+' a '+n+' de '+n+'</b></div><div class="kv"><span>Ainda vão vencer</span><b>'+(rest?rest+'x · '+c2s(l.vParc*rest):'nenhuma ✓')+'</b></div>':'')+
+  '<div class="kv"><span>'+(n>1?'Primeira no app':'Fatura')+'</span><b>'+esc(capM(l.fat))+' '+l.fat.slice(0,4)+'</b></div><div class="sub" style="margin-top:4px">Valor e parcelas vêm da fatura do banco e não mudam aqui.</div></div>';
+ var cs=catsUsadas(),top=cs.slice(0,8);if(i.cat&&top.indexOf(i.cat)<0)top.unshift(i.cat);var lst=i.verCats?cs:top;
+ h+='<div class="f"><label>Categoria</label><div class="chips">'+lst.map(function(x){return '<button class="'+(i.cat===x?'on':'')+'" onclick="impSet(\'cat\',catsUsadas()['+cs.indexOf(x)+'])">'+icCat(x)+' '+esc(x)+'</button>'}).join('')+(i.verCats?'':'<button onclick="impSet(\'verCats\',true)">mais…</button>')+'</div></div>';
+ h+='<div class="f"><div class="chips"><button class="'+(i.de==='pai'?'on':'')+'" onclick="impSet(\'de\',IMP.de===\'pai\'?\'eu\':\'pai\')">'+(i.de==='pai'?'✓ ':'')+'É do meu pai</button></div></div>';
+ var cr=carrosAtivos();if(i.carro&&carro(i.carro)&&cr.indexOf(carro(i.carro))<0)cr=cr.concat([carro(i.carro)]);
+ if(cr.length)h+='<div class="f"><label>Carro</label><select id="impCarro"><option value="">Nenhum</option>'+cr.map(function(x){return '<option value="'+x.id+'"'+(i.carro===x.id?' selected':'')+'>'+esc(x.nome)+'</option>'}).join('')+'</select></div>';
+ h+='<button class="btn" style="font-size:17px;padding:15px" onclick="impSalvar()">Salvar</button><div class="outros"><a style="color:var(--red)" onclick="impApagar()">Apagar esta compra</a></div><button class="btn sec" onclick="fechar()">Voltar</button>';
+ var sh=document.getElementById('sheet'),aberto=document.getElementById('ov').classList.contains('open'),st=aberto?sh.scrollTop:0;abrir(h);if(aberto)sh.scrollTop=st}
+function impSalvar(){impLer();var i=IMP,l=porId(S.lanc,i.id);if(!l)return;var d=String(i.desc||'').trim();if(!d){toast('Escreva o nome');return}d=d.charAt(0).toUpperCase()+d.slice(1);
+ editar(l,{desc:d,cat:i.cat||'A classificar',de:i.de,carro:i.carro&&carro(i.carro)?i.carro:null});save();_memo=null;fechar();render();toast('Salvo')}
+function impApagar(){var l=porId(S.lanc,IMP&&IMP.id);if(!l)return;if(!confirm('Apagar esta compra? Ela sai das faturas (todas as parcelas).'))return;editar(l,{del:true});save();_memo=null;fechar();render();toast('Compra apagada')}
+
 
 /* ===== Hudson 14/11: resumo do mês no Hoje — quanto ENTROU e quanto SAIU da SUA parte e quanto sobrou (verde/vermelho).
    Dinheiro de verdade (caixa): reembolso do pai não é entrada, a parte dele na fatura não é saída, empréstimo não é renda,
@@ -2212,7 +2246,7 @@ function catApagarOk(){var a=_CATV.c;S.catsUser=S.catsUser.filter(function(c){re
  save();catsSync();fechar();render();toast('Categoria apagada')}
 function abrirNovaCat(){abrir('<h3>Nova categoria</h3><div class="sub">Ex.: Namorada, Pet, Faculdade. Aparece na hora de lançar um gasto.</div><div class="f" style="margin-top:10px"><label>Nome</label><input id="catNova" autocomplete="off" placeholder="Nome da categoria"></div><button class="btn" onclick="var n=criarCategoria(val(\'catNova\'));if(n){fechar();render()}">Criar</button><button class="btn sec" onclick="fechar()">Cancelar</button>');setTimeout(function(){try{document.getElementById('catNova').focus()}catch(e){}},250)}
 function catsCardMais(){var ym=ymOf(hoje()),cm=catsMes(ym).c,u=(S.catsUser||[]);
- var h='<div class="card"><h2>Suas categorias</h2>'+(u.length?u.map(function(c){return '<div class="row tap" onclick="abrirCat(\''+esc(c).replace(/'/g,"\\'")+'\',\''+ym+'\')"><div class="bub out">🏷️</div><div class="g"><div class="t">'+esc(c)+'</div><div class="s">'+esc(mesNome(ym))+'</div></div><b>'+c2s(cm[c]||0)+'</b></div>'}).join(''):'<div class="empty">Nenhuma ainda.</div>')+
+ var h='<div class="card"><h2>Suas categorias</h2>'+(u.length?u.map(function(c){return '<div class="row tap" onclick="abrirCat(\''+esc(c).replace(/'/g,"\\'")+'\',\''+ym+'\')"><div class="bub out">'+icCat(c)+'</div><div class="g"><div class="t">'+esc(c)+'</div><div class="s">'+esc(mesNome(ym))+'</div></div><b>'+c2s(cm[c]||0)+'</b></div>'}).join(''):'<div class="empty">Nenhuma ainda.</div>')+
   '<button class="btn sm sec" onclick="abrirNovaCat()">+ Nova categoria</button></div>';return h}
 /* suas categorias aparecem logo depois das mais usadas (não lá no fim) */
 window.catsUsadas=catsUsadas=function(){var n={},lim=addD(hoje(),-120);viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat&&!l.imp&&l.data>=lim)n[l.cat]=(n[l.cat]||0)+1});
