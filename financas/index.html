@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=70, APP_DATE='15/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=71, APP_DATE='15/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -320,7 +320,7 @@ function itensFatura(cid,ym){
  var c=cartao(cid),out=[];if(!c)return out;
  viv(S.lanc).forEach(function(l){if(l.tipo!=='gasto'||l.meio!==cid)return;var n=Math.max(1,+l.parc||1),base=faturaDe(c,l.data);
   /* compra que veio da fatura do banco: parcela parcIni cai na fatura l.fat, cada uma com o valor exato do banco */
-  if(l.fat){var k0=Math.max(1,+l.parcIni||1);for(var q=k0;q<=n;q++)if(addM(l.fat,q-k0)===ym)out.push({kind:'lanc',l:l,v:l.vParc,i:q,n:n,pai:l.de==='pai',data:l.data,nome:l.desc||l.cat||'Compra'});return}
+  if(l.fat){var k0=Math.max(1,+l.parcIni||1);for(var q=k0;q<=n;q++)if(addM(l.fat,q-k0)===ym)out.push({kind:'lanc',l:l,v:(q===k0&&l.vParcIni!=null)?l.vParcIni:l.vParc,i:q,n:n,pai:l.de==='pai',data:l.data,nome:l.desc||l.cat||'Compra'});return}
   for(var i=0;i<n;i++)if(addM(base,i)===ym)out.push({kind:'lanc',l:l,v:parcV(l.valor,n,i),i:i+1,n:n,pai:l.de==='pai',data:l.data,nome:l.desc||l.cat||'Compra'})});
  fixasHist().forEach(function(f){if(f.meio!==cid)return;for(var k=-2;k<=1;k++){var mm=addM(ym,k);if(!fixaVigente(f,mm)||(S.fixasMes[f.id+'|'+mm]||{}).apagada)continue;var dt=diaNoMes(mm,f.dia||1);
   if(faturaDe(c,dt)===ym)out.push({kind:'fixa',f:f,v:valorFixa(f,mm),pai:false,data:dt,nome:f.nome,mes:mm})}});
@@ -333,6 +333,8 @@ function emUsoCartao(cid){var t=hoje(),tot=0;for(var i=0;i<40;i++){var ym=addM(S
 function limiteCartao(c){if(!(c.limite>0))return null;var u=emUsoCartao(c.id);return {limite:c.limite,uso:u,disp:c.limite-u,pct:Math.min(100,Math.max(0,u/c.limite*100))}}
 function fatura(cid,ym){
  var k=cid+'|'+ym,f=S.faturas[k]||{},its=itensFatura(cid,ym),c=cartao(cid);
+ /* Hudson 15/11: conta fixa no cartão só entra na fatura (e no limite) quando chega o dia da cobrança — antes fica em "ainda vai entrar" */
+ var tH=hoje(),futs=its.filter(function(i){return i.kind==='fixa'&&i.data>tH});its=its.filter(function(i){return !(i.kind==='fixa'&&i.data>tH)});
  /* parte do pai (Hudson 03/11): cada compra dele entra arredondada em reais (até 50 centavos para baixo, acima de 50 para cima);
     valor da parte do pai informado à mão = compras antigas; compra nova marcada "do pai" soma por cima */
  var som=soma(its,function(x){return x.v}),paiIts=its.filter(function(x){return x.pai}),paiNovos=paiIts.filter(function(x){return !(x.l&&x.l.imp)});
@@ -341,7 +343,7 @@ function fatura(cid,ym){
  var pags=viv(S.lanc).filter(function(l){return l.tipo==='pagfatura'&&l.ref===k}),pago=soma(pags,function(l){return l.valor});
  var reembs=viv(S.lanc).filter(function(l){return l.tipo==='reembolso'&&l.ref===k}),reemb=soma(reembs,function(l){return l.valor});
  return {k:k,cid:cid,ym:ym,nome:c?c.nome:'?',vence:diaNoMes(ym,c?(+c.vence||1):1),valor:valor,pai:pai,sua:valor-pai,soma:som,its:its,
-  informado:f.banco!=null||its.some(function(i){return i.kind==='lanc'&&i.l.imp}),naoId:f.banco!=null?f.banco-som:0,pago:pago,resta:Math.max(0,valor-pago),pags:pags,reemb:reemb,paiPend:Math.max(0,pai-reemb),paiBase:f.pai!=null?f.pai:null,paiNovos:paiNovos};
+  informado:f.banco!=null||its.some(function(i){return i.kind==='lanc'&&i.l.imp}),naoId:f.banco!=null?f.banco-som:0,pago:pago,resta:Math.max(0,valor-pago),pags:pags,futs:futs,aEntrar:soma(futs,function(i){return i.v}),reemb:reemb,paiPend:Math.max(0,pai-reemb),paiBase:f.pai!=null?f.pai:null,paiNovos:paiNovos};
 }
 function arredPai(v){var c=((v%100)+100)%100,r=(v-c)/100;return (c>50?r+1:r)*100}
 /* texto para mandar ao pai pelo WhatsApp (Hudson 03/11 (3)): TODAS as parcelas dele, mês a mês, a partir desta fatura,
@@ -405,10 +407,11 @@ function itensMes(ym){
  fixasHist().forEach(function(f){if(!fixaVigente(f,ym)||ehCartao(f.meio))return;var x=fixaMes(f,ym);
   if((S.fixasMes[x.k]||{}).apagada&&!x.pago){out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,sinal:-1,valor:0,resta:0,cert:'certo',titulo:f.nome,status:'parado',apagada:true});return}
   out.push({kind:'fixa',id:f.id,ym:ym,data:x.due,semData:x.semData,sinal:-1,valor:x.valor,resta:x.resta,cert:'certo',titulo:f.nome,status:x.resta<=0?'pago':(atras(x.due)?'atrasado':'pendente')})});
- viv(S.cartoes).forEach(function(c){var x=fatura(c.id,ym),pv=paiVisivel(c.id,ym,x);if(x.valor<=0&&!x.informado&&!(pv>0))return;
+ viv(S.cartoes).forEach(function(c){var x=fatura(c.id,ym),pv=paiVisivel(c.id,ym,x),ae=x.aEntrar||0;if(x.valor+ae<=0&&!x.informado&&!(pv>0))return;
   /* Hudson 15/11: o que você pagou ANTES do mês da fatura (adiantado) já saiu no mês em que pagou: aqui só fica o resto */
   var pa=x.pags.filter(function(l){return !l.fora&&l.data&&ymOf(l.data)<ym}),ant=Math.min(x.valor,soma(pa,function(l){return l.valor})),shp=x.valor>0?pv/x.valor:0;
-  out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor-ant,valorFat:x.valor,antes:ant,antesYm:pa.length?ymOf(pa[0].data):'',resta:x.resta,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:x.resta<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:ant?Math.max(0,pv-Math.round(ant*shp)):pv,paiFat:pv});
+  var rsP=Math.max(0,x.valor+ae-x.pago);
+  out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor+ae-ant,valorFat:x.valor+ae,aEntrar:ae,antes:ant,antesYm:pa.length?ymOf(pa[0].data):'',resta:rsP,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:rsP<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:ant?Math.max(0,pv-Math.round(ant*shp)):pv,paiFat:pv});
 });
  (function(){var cp=contaPai(ym);if(cp.total>0)out.push({kind:'reemb',id:'pai',ym:ym,data:cp.vence,sinal:1,valor:cp.total,resta:cp.resta,cert:'provavel',titulo:'Reembolso do seu pai (cartões)',status:cp.resta<=0?'pago':'pendente'})})();
  (S.carros||[]).filter(Boolean).forEach(function(car){if(car.del){semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){var rs=recebSemana('carro',car.id,s);if(rs.length)out.push({kind:'carro',id:car.id,sem:s,data:s,sinal:1,valor:soma(rs,function(l){return l.valor}),resta:0,cert:'certo',titulo:car.nome,status:'pago',nota:'carro excluído · recebido'})});return}
@@ -557,7 +560,7 @@ function linhaItem(x,proj,dep){
  if(x.kind==='carro'&&x.status==='pago'&&x.contrato&&x.valor!==x.contrato)sub.push('contrato '+c2s(x.contrato));
  if((x.kind==='carro'||x.kind==='multa')&&x.nota&&x.status!=='pago')sub.push(x.nota);
  if(proj&&x.resta!==x.valor&&x.status!=='parado'&&!x._semDe&&!(x.kind==='fatura'&&x.pai>0))sub.push('de '+c2s(x.valor));
- if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte · fatura '+c2s(x.valorFat||x.valor));if(x.kind==='fatura'&&x.antes>0)sub.push(c2s(x.antes)+' pago antes, em '+mesSo(x.antesYm));
+ if(x.kind==='fatura'&&x.pai>0)sub.push('sua parte · fatura '+c2s(x.valorFat||x.valor));if(x.kind==='fatura'&&x.antes>0)sub.push(c2s(x.antes)+' pago antes, em '+mesSo(x.antesYm));if(x.kind==='fatura'&&x.aEntrar>0)sub.push('inclui '+c2s(x.aEntrar)+' de fixas que ainda vão entrar');
  var muted=(x.status==='pago'||x.status==='parado'||x.status==='cartao')&&!proj?' muted':'';
  var pl=pillStatus(x,proj),aft='';
  if(dep&&x.sinal<0&&saldoTotal()!=null)aft='<small class="'+(dep.saldo<0?'neg':'')+'">'+(dep.saldo<0?'faltam '+c2s(-dep.saldo):'sobra '+c2s(dep.saldo))+'</small>';
@@ -1356,6 +1359,7 @@ function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
  h+=blocoPagar('fatura',cid,ym,x.resta,x.vence);
  if(x.resta>0&&optContas().length)h+='<button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirPagFat(\''+cid+'\',\''+ym+'\')">Pagar só uma parte, outra data ou outra conta</button>';
  h+=maisOpcoes(fMoney('fBanco','Valor que o banco cobra',f.banco,'Deixe vazio para usar a soma dos itens lançados ('+c2s(x.soma)+').')+
+  (x.pago>0?fSel('fLiq','Esse valor do banco…',[['tot','É o total da fatura (antes dos pagamentos)'],['liq','Já desconta o que paguei ('+c2s(x.pago)+')']],'tot','O app do banco costuma mostrar o valor já descontando o que você pagou.'):'')+
   fMoney('fPai','Parte do seu pai nesta fatura',f.pai,'Compras antigas dele. As novas que você marcar "do pai" somam por cima (arredondadas).')+
   '<button class="btn" onclick="salvarFatura(\''+cid+'\',\''+ym+'\')">Salvar valores</button>',x.informado?'Corrigir o valor da fatura':'Digitar o valor que o banco cobra');
  var refP=cartaoPai(),ehRef=!refP||refP.id===cid,pvT=paiVisivel(cid,ym,x);
@@ -1368,6 +1372,8 @@ function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
  h+=catsFatCard([cid],ym,"filho('abrirFatura','"+cid+"','"+ym+"');",cid+'|'+ym);
  h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.slice().sort(function(a,b){var da=a.data||'',db=b.data||'';if(da!==db)return da<db?1:-1;return ((b.l&&b.l.criado)||0)-((a.l&&a.l.criado)||0)}).forEach(function(i){h+=linhaItemFat(i,"filho('abrirFatura','"+cid+"','"+ym+"');",false)});
  if(!x.its.length)h+='<div class="empty">Nenhuma compra lançada neste cartão para esta fatura.</div>';
+ if(x.futs&&x.futs.length){h+='</div><div class="card"><h2>Ainda vão entrar ('+c2s(x.aEntrar)+')</h2><div class="sub" style="margin:-4px 0 6px">Contas fixas neste cartão: entram na fatura e no limite no dia da cobrança.</div>';
+  x.futs.forEach(function(i){h+='<div class="kv"><span>'+esc(i.nome)+' · '+esc(dcurto(i.data))+'</span><b>'+c2s(i.v)+'</b></div>'})}
  abrir(h+'</div><button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirCartao(\''+cid+'\')">Dias de fechamento e vencimento</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
 function cardContaPai(P){var cp=contaPai(P);if(!(cp.total>0))return '';var ks=Object.keys(cp.porC);
  return '<div class="card tap" onclick="abrirContaPai(\''+P+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div class="mid">↩️ Conta do seu pai</div><span class="sub" style="font-size:20px">›</span></div>'+
@@ -1389,7 +1395,7 @@ function receberPai(P,form){var cp=contaPai(P),v,c,d;if(form){v=dinheiro('cpVal'
  if(!(v>0)||!c){toast('Nada a receber');return}
  var l={id:uid(),tipo:'reembolso',ref:'pai|'+P,valor:v,meio:c,data:d,desc:'Reembolso do pai (cartões)',criado:Date.now(),at:Date.now()};S.lanc.push(l);S.ultConta=c;save();render();
  var re=function(){abrirContaPai(P)};if(document.getElementById('ov').classList.contains('open'))re();toastDesf('Seu pai: '+c2s(v)+' recebido',{lanc:[l.id],reabre:re})}
-function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco')),p=parseBRL(val('fPai')),f=S.faturas[k]||(S.faturas[k]={});editar(f,{banco:b,pai:p});save();abrirFatura(cid,ym);render();toast('Fatura atualizada')}
+function salvarFatura(cid,ym){var k=cid+'|'+ym,b=parseBRL(val('fBanco'));if(b!=null&&val('fLiq')==='liq')b+=fatura(cid,ym).pago;var p=parseBRL(val('fPai')),f=S.faturas[k]||(S.faturas[k]={});editar(f,{banco:b,pai:p});save();abrirFatura(cid,ym);render();toast('Fatura atualizada')}
 function pagarFatura(cid,ym){var v=dinheiro('fPag',true);if(v==null)return;S.ultConta=val('fConta');S.lanc.push({id:uid(),tipo:'pagfatura',ref:cid+'|'+ym,valor:v,meio:val('fConta'),data:val('fData')||hoje(),criado:Date.now(),at:Date.now()});save();abrirFatura(cid,ym);render();toast('Pagamento registrado')}
 function desfazer(lid){var l=porId(S.lanc,lid);if(!l)return;if(!confirm('Desfazer este registro?'))return;editar(l,{del:true});save();fechar();render();toast('Desfeito')}
 
@@ -1578,7 +1584,7 @@ function novoLanc(tipo){if(precisaConta())return;var t=tipo||'gasto';NL={tipo:t,
 function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesVelhas=S.atualizacoesVelhas||{};
  if(S.atualizacoesVelhas[d.id]){alert('Este arquivo é antigo e já foi substituído por uma atualização mais nova que você já carregou. Não precisa carregar.');return}
  if(S.atualizacoes[d.id]&&!confirm('Esta atualização já foi aplicada em '+new Date(S.atualizacoes[d.id]).toLocaleString('pt-BR')+'. Aplicar de novo? (não duplica nada)'))return;
- var ja=viv(S.lanc).filter(function(l){return l.tipo==='gasto'&&!l.imp&&(d.cartoes||[]).some(function(c){return c.id===l.meio})&&l.data<=hoje()});
+ var ja=d.semAvisoRepetidas?[]:viv(S.lanc).filter(function(l){return l.tipo==='gasto'&&!l.imp&&(d.cartoes||[]).some(function(c){return c.id===l.meio})&&l.data<=hoje()});
  if(!confirm((d.resumo||'Aplicar a atualização?')+(ja.length?'\n\nAtenção: você já tinha '+ja.length+' compra(s) lançada(s) nesses cartões; elas continuam e podem estar repetidas no total à vista.':'')+'\n\nNada do que você lançou é apagado.'))return;
  try{localStorage.setItem(KEY+'_antes_atualizacao',JSON.stringify(S))}catch(e){}
  var n={cart:0,lanc:0,fix:0,av:0,car:0,pag:0};
@@ -1941,6 +1947,7 @@ function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
   dias[d].forEach(function(x){var fp=ehFatIt(x)&&x.pai>0,st=x.status==='pago'?(x.sinal>0?'recebido':'pago'):(x.data<t&&x.resta>0?'<span class="neg">'+(x.sinal>0?'atrasado':'em aberto')+'</span>':(x.cert==='incerta'?'incerto':''));
    if(fp)st=(st?st+' · ':'')+'sua parte · seu pai '+c2s(x.pai);
    if(x.kind==='fatura'&&x.antes>0)st=(st?st+' · ':'')+c2s(x.antes)+' pago em '+mesSo(x.antesYm);
+   if(x.kind==='fatura'&&x.aEntrar>0)st=(st?st+' · ':'')+'inclui '+c2s(x.aEntrar)+' de fixas que ainda vão entrar';
    h+=rowN(x,{sub:st,v:fp?(x.status==='pago'||!(suaR(x)>0)?suaV(x):suaR(x)):(x.status==='pago'?x.valor:(x.resta>0?x.resta:x.valor))})});
   h+='</div>'});
  return h}
