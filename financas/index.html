@@ -229,7 +229,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=64, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=65, APP_DATE='14/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1340,7 +1340,8 @@ function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
    '<div class="sub" style="margin-top:6px">Ele devolve tudo junto, todo dia '+(ref?(+ref.vence||1):24)+(ref&&ref.id!==cid?', pelo fechamento do '+esc(ref.nome)+(ref.fecha?' (dia '+ref.fecha+')':''):'')+' — não importa em qual cartão foi a compra.</div></div>'+
    '<button class="btn sec" onclick="copiarPai(\''+ks[0]+'\')">📋 Copiar a conta do pai ('+c2s(contaPai(ks[0]).total)+')</button>'})():'');
  x.pags.forEach(function(l){h+='<div class="row"><div class="g"><div class="t">Pago '+c2s(l.valor)+'</div><div class="s">'+dlab(l.data)+' · '+esc(nomeContaL(l))+'</div></div><button class="btn sm red" onclick="desfazer(\''+l.id+'\')">Desfazer</button></div>'});
- h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.slice().sort(function(a,b){var da=a.data||'',db=b.data||'';if(da!==db)return da<db?1:-1;return ((b.l&&b.l.criado)||0)-((a.l&&a.l.criado)||0)}).forEach(function(i){h+='<div class="row tap" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');'+(i.kind==='lanc'?"abrirLanc('"+i.l.id+"')":"abrirFixa('"+i.f.id+"')")+'"><div class="g"><div class="t">'+esc(i.nome)+(i.pai?' <span class="pill inf">pai</span>':'')+(i.n>1?' <span class="pill">'+i.i+'/'+i.n+'</span>':'')+'</div><div class="s">'+dlab(i.data)+(i.kind==='fixa'?' · conta fixa':'')+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'});
+ h+=catsFatCard([cid],ym,"filho('abrirFatura','"+cid+"','"+ym+"');",cid+'|'+ym);
+ h+='<div class="card"><h2>Itens lançados ('+x.its.length+')</h2>';x.its.slice().sort(function(a,b){var da=a.data||'',db=b.data||'';if(da!==db)return da<db?1:-1;return ((b.l&&b.l.criado)||0)-((a.l&&a.l.criado)||0)}).forEach(function(i){h+=linhaItemFat(i,"filho('abrirFatura','"+cid+"','"+ym+"');",false)});
  if(!x.its.length)h+='<div class="empty">Nenhuma compra lançada neste cartão para esta fatura.</div>';
  abrir(h+'</div><button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirCartao(\''+cid+'\')">Dias de fechamento e vencimento</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
 function cardContaPai(P){var cp=contaPai(P);if(!(cp.total>0))return '';var ks=Object.keys(cp.porC);
@@ -1918,7 +1919,32 @@ function vCartoes(){var h=mnav(),cs=viv(S.cartoes);
  var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
  var fut=[1,2,3].map(function(i){var ym=addM(M,i);return [ym,soma(cs,function(c){return fatura(c.id,ym).soma})]}).filter(function(f){return f[1]>0});
  h+=secN('Total de '+capM(M)+' <em>'+c2s(tot)+'</em>',fut.length?fut.map(function(f){return '<div class="kv2"><span>'+capM(f[0])+' (já comprometido)</span><b>'+c2s(f[1])+'</b></div>'}).join(''):'<div class="kv2"><span>Nada comprometido nos próximos meses</span></div>');
+ h+=catsFatCard(cs.map(function(c){return c.id}),M,'','|'+M);
  return h+'<button class="btn sec" onclick="abrirCartao()">+ Cartão</button>'}
+
+/* ---------- cartões por categoria (Hudson 14/11 23:25): igual à aba Gastos, mas pela FATURA do mês
+   (parcela que cai nesta fatura + contas fixas no cartão). Compras do pai ficam fora (ele devolve). ---------- */
+function catItemFat(i){return i.kind==='fixa'?(i.f.cat||'Contas fixas'):(i.l.cat||'A classificar')}
+function catsFat(cids,ym){var porCat={},its=[],tot=0;cids.forEach(function(cid){fatura(cid,ym).its.forEach(function(i){if(i.pai)return;var c=catItemFat(i);porCat[c]=(porCat[c]||0)+i.v;tot+=i.v;its.push({i:i,cid:cid,cat:c})})});return {porCat:porCat,tot:tot,its:its}}
+function _qCat(k){return esc(k).replace(/'/g,"\\'")}
+/* sua parte que o banco cobra mas não tem item lançado (só quando o valor do banco foi informado) */
+function semDetFat(cids,ym){return soma(cids,function(cid){var x=fatura(cid,ym);if(!(x.naoId>0))return 0;var t=soma(x.its.filter(function(i){return !i.pai}),function(i){return i.v});return Math.min(x.naoId,Math.max(0,x.sua-t))})}
+function catsFatCard(cids,ym,volta,key){var r=catsFat(cids,ym),sd=semDetFat(cids,ym),ks=Object.keys(r.porCat).sort(function(a,b){return r.porCat[b]-r.porCat[a]});if(!ks.length&&!sd)return '';var tot=r.tot+sd;
+ var todos=cids.length>1||key.charAt(0)==='|';
+ var h='<div class="card"><div class="sub" style="font-weight:650">'+(todos?'Todos os cartões · fatura de '+esc(mesNome(ym).split(' ')[0]):'Onde foi a sua parte')+'</div><div class="big" style="margin:2px 0 4px">'+c2s(tot)+'</div><div class="sub">'+(todos?'sua parte nas faturas':'sua parte nesta fatura')+' · '+r.its.length+' ite'+(r.its.length!==1?'ns':'m')+' · fora as do seu pai</div><div class="hr"></div>';
+ h+=ks.map(function(k){var v=r.porCat[k],pc=tot?v/tot*100:0;return '<div class="catr tap" onclick="'+volta+'abrirCatFat(\''+_qCat(k)+'\',\''+key+'\')"><div class="kv"><span>'+icCat(k)+' '+esc(k)+'</span><b>'+c2s(v)+' <span class="sub">'+(pc>0&&pc<1?'<1':Math.round(pc))+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%"></i></div></div>'}).join('');
+ if(sd>0){var pc=sd/tot*100;h+='<div class="catr"><div class="kv"><span>❔ Sem detalhe</span><b>'+c2s(sd)+' <span class="sub">'+(pc<1?'<1':Math.round(pc))+'%</span></b></div><div class="cb"><i style="width:'+Math.max(2,pc)+'%;background:var(--tx3)"></i></div><div class="sub" style="margin-top:2px">o banco cobra, mas as compras não estão lançadas</div></div>'}
+ return h+'</div>'}
+function linhaItemFat(i,volta,mostraCartao){var cat=catItemFat(i),cl=i.kind==='lanc'&&precisaClass(i.l),c=mostraCartao?cartao(mostraCartao):null;
+ var on=volta+(i.kind==='lanc'?(cl?"classUm('"+i.l.id+"')":"abrirLanc('"+i.l.id+"')"):"abrirFixa('"+i.f.id+"')");
+ var sub=[dcurto(i.data)];if(c)sub.push('💳 '+c.nome);if(i.n>1)sub.push(i.i+'/'+i.n);if(i.kind==='fixa')sub.push('conta fixa');
+ return '<div class="rn tap'+(i.pai?' muted':'')+'" onclick="'+on+'"><div class="bub '+(i.pai?'off':'out')+'">'+(i.pai?'↩️':icCat(cat))+'</div><div class="g"><div class="t">'+esc(i.nome)+'</div><div class="s">'+esc(sub.join(' · '))+' · '+(i.pai?'do seu pai':cl?'<span class="pill inf">classificar</span>':esc(cat))+'</div></div><div class="v">'+c2s(i.v)+'</div></div>'}
+function abrirCatFat(cat,key){var p=key.split('|'),cid=p[0],ym=p[1],cids=cid?[cid]:viv(S.cartoes).map(function(c){return c.id});
+ var r=catsFat(cids,ym),its=r.its.filter(function(o){return o.cat===cat}),tot=soma(its,function(o){return o.i.v}),c=cid?cartao(cid):null,tt=r.tot+semDetFat(cids,ym);
+ its.sort(function(a,b){return a.i.data<b.i.data?1:a.i.data>b.i.data?-1:0});
+ var h='<h3>'+icCat(cat)+' '+esc(cat)+'</h3><div class="sub">'+(c?'Fatura '+esc(c.nome):'Todos os cartões')+' · '+esc(mesNome(ym))+'</div><div class="card" style="margin-top:12px;text-align:center"><div class="sub">Nesta fatura</div><div class="big">'+c2s(tot)+'</div><div class="sub">'+its.length+' ite'+(its.length!==1?'ns':'m')+(tt?' · '+Math.round(tot/tt*100)+'% '+(c?'da sua parte':'dos cartões'):'')+'</div></div>';
+ h+='<div class="card cn">'+(its.length?its.map(function(o){return linhaItemFat(o.i,"filho('abrirCatFat','"+_qCat(cat)+"','"+key+"');",cid?null:o.cid)}).join(''):'<div class="empty">Nada nesta categoria.</div>')+'</div>';
+ abrir(h+'<button class="btn sec" onclick="fechar()">Voltar</button>')}
 
 /* ---------- CARROS ---------- */
 function vCarros(){var h=mnav(),cs=carrosAtivos(),rs=viv(S.rendas);
