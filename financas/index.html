@@ -193,7 +193,7 @@ header .gear{border:0;background:var(--chip);color:var(--tx2);width:34px;height:
 .vazio{text-align:center;color:var(--tx2);padding:30px 0;font-size:15px}
 .tri3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0 4px}.tri3 div{background:var(--card);border-radius:15px;padding:9px 10px;box-shadow:var(--sh);min-width:0}.tri3 span{display:block;font-size:12px;color:var(--tx2);font-weight:600}.tri3 b{font-size:14px;white-space:nowrap;letter-spacing:-.3px;display:block;overflow:hidden;text-overflow:ellipsis}
 .dh{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.3px;padding:14px 0 2px}.dh:first-child{padding-top:10px}.dh.hoje{color:var(--acc)}.dh span:last-child{text-transform:none;letter-spacing:0;font-weight:600}
-.cc2{border-radius:22px;padding:15px 17px;margin:12px 0;color:#fff;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.14)}.cc2 .l1{display:flex;justify-content:space-between;font-size:14px;font-weight:650;opacity:.92}.cc2 .amt{font-size:30px;font-weight:780;letter-spacing:-.6px;margin:6px 0 4px}
+.cc2{border-radius:22px;padding:15px 17px;margin:12px 0;color:#fff;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.14)}.cc2 .l1{display:flex;justify-content:space-between;font-size:14px;font-weight:650;opacity:.92}.cc2 .amt{font-size:30px;font-weight:780;letter-spacing:-.6px;margin:6px 0 4px}.cc2 .amt small{font-size:15px;font-weight:650;opacity:.85;margin-left:7px;letter-spacing:0}
 .kv2{display:flex;justify-content:space-between;padding:11px 0;font-size:15px;border-top:.5px solid var(--line)}.cn>.kv2:first-child{border-top:0}.kv2 span{color:var(--tx2)}.kv2.tot{border:0;padding:4px 4px 0}
 .car2 .l1{display:flex;justify-content:space-between;align-items:center}.car2 .l1 b{font-size:18px}.car2 .l2{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}.car2 .l2 span{font-size:14px;color:var(--tx2)}.car2 .l2 b{font-size:19px}
 .mini{text-align:center;font-size:13px;color:var(--tx2);margin:10px 0}.tri3.rs{margin-top:0}.tri3.rs .ok{background:var(--grn2)}.tri3.rs .ok b{color:var(--grn)}.tri3.rs .bad{background:var(--red2)}.tri3.rs .bad b{color:var(--red)}.mini a{color:var(--acc);font-weight:650;cursor:pointer}
@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=69, APP_DATE='15/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=70, APP_DATE='15/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1949,12 +1949,13 @@ function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
 function vCartoes(){var h=mnav(),cs=viv(S.cartoes);
  if(!cs.length)return h+'<div class="card"><div class="empty">Nenhum cartão.</div><button class="btn" onclick="abrirCartao()">Cadastrar cartão</button></div>';
  var tot=0;h+=cardClass();
- cs.forEach(function(c){var x=fatura(c.id,M),L=limiteCartao(c);tot+=x.valor;
-  h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':'vence '+dcurto(x.vence))+'</span></div><div class="amt">'+c2s(x.valor)+'</div>'+
-   '<div class="l1"><span>'+(function(){var pv=paiVisivel(c.id,M,x);return pv>0?(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv)):(x.informado?'':'estimada')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
+ var pagT=0,resT=0;cs.forEach(function(c){var x=fatura(c.id,M),L=limiteCartao(c);tot+=x.valor;pagT+=Math.min(x.pago,x.valor);resT+=x.resta;
+  h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':'vence '+dcurto(x.vence))+'</span></div><div class="amt">'+(x.pago>0&&x.resta>0?c2s(x.resta)+'<small>falta</small>':c2s(x.valor))+'</div>'+
+   '<div class="l1"><span>'+(function(){var pv=paiVisivel(c.id,M,x),b=[];if(x.pago>0&&x.resta>0)b.push('pago '+c2s(x.pago)+' de '+c2s(x.valor));
+    if(pv>0)b.push(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv));else if(!x.informado&&!b.length)b.push('estimada');return b.join(' · ')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
  var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
  var fut=[1,2,3].map(function(i){var ym=addM(M,i);return [ym,soma(cs,function(c){return fatura(c.id,ym).soma})]}).filter(function(f){return f[1]>0});
- h+=secN('Total de '+capM(M)+' <em>'+c2s(tot)+'</em>',fut.length?fut.map(function(f){return '<div class="kv2"><span>'+capM(f[0])+' (já comprometido)</span><b>'+c2s(f[1])+'</b></div>'}).join(''):'<div class="kv2"><span>Nada comprometido nos próximos meses</span></div>');
+ h+=secN('Total de '+capM(M)+' <em>'+c2s(tot)+'</em>',(pagT>0?'<div class="kv2"><span>Já pago</span><b class="pos">'+c2s(pagT)+'</b></div><div class="kv2"><span>Falta pagar</span><b>'+c2s(resT)+'</b></div>':'')+(fut.length?fut.map(function(f){return '<div class="kv2"><span>'+capM(f[0])+' (já comprometido)</span><b>'+c2s(f[1])+'</b></div>'}).join(''):'<div class="kv2"><span>Nada comprometido nos próximos meses</span></div>'));
  h+=catsFatCard(cs.map(function(c){return c.id}),M,'','|'+M);
  return h+'<button class="btn" onclick="abrirPagFat(\'\',\'\',M)">Pagar fatura (inteira, uma parte ou adiantado)</button><button class="btn sec" onclick="abrirCartao()">+ Cartão</button>'}
 
