@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=73, APP_DATE='16/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=74, APP_DATE='17/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1584,7 +1584,10 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
    if(o.fechaVelha&&c.fecha===o.fechaVelha&&c.hist){for(var hi=c.hist.length-1;hi>=0;hi--){var pv=c.hist[hi].prev||{};if(pv.fecha!=null&&pv.fecha!==o.fechaVelha){p.fecha=pv.fecha;break}}}}if(c&&c.vence&&o.fechaSoSeVazio)delete p.vence;
   if(!c){if(!o.nome)return;S.cartoes.push(Object.assign({id:o.id,criado:Date.now()},p))}else{if(c.del)p.del=false;if(o.nomeSoSeVazio&&c.nome)delete p.nome;editar(c,p)}n.cart++});
  (d.faturas||[]).forEach(function(o){var f=S.faturas[o.k]||(S.faturas[o.k]={});if('banco' in o)editar(f,{banco:o.banco});if('pai' in o)editar(f,{pai:o.pai})});
- (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;editar(l,pt);return}S.lanc.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.lanc++});
+ (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;delete pt.pularSeJaTem;editar(l,pt);return}
+  /* Hudson 17/11: compra que você já lançou à mão (mesmo cartão, mesmo valor, até 3 dias de diferença) não entra de novo */
+  if(o.pularSeJaTem&&viv(S.lanc).some(function(x){return x.tipo==='gasto'&&x.meio===o.meio&&!x.imp&&Math.abs((+x.valor||0)-(+o.valor||0))<1&&Math.abs(new Date(x.data+'T12:00')-new Date(o.data+'T12:00'))<=3*864e5})){n.pulou=(n.pulou||0)+1;return}
+  var nv=Object.assign({criado:Date.now(),at:Date.now()},o);delete nv.pularSeJaTem;S.lanc.push(nv);n.lanc++});
  (d.removerFixas||[]).forEach(function(id){var f=porId(S.fixas,id);if(f&&!f.del)editar(f,{del:true})});
  (d.fixasNovas||[]).forEach(function(o){if(porId(S.fixas,o.id))return;S.fixas.push(Object.assign({criado:Date.now()},o));n.fix++});
  (d.fixas||[]).forEach(function(o){var re=new RegExp(o.nome,'i');viv(S.fixas).forEach(function(f){if(re.test(f.nome)){editar(f,o.patch);n.fix++}})});
@@ -1597,7 +1600,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  (d.removerAvulsas||[]).forEach(function(id){var a=porId(S.avulsas,id);if(a&&!a.del)editar(a,{del:true})});
  (d.substitui||[]).forEach(function(i){S.atualizacoesVelhas[i]=Date.now()});
  S.atualizacoes[d.id]=Date.now();save();M=mesPadrao();render();
- toast('Atualização aplicada: '+n.lanc+' compras/parcelas, '+n.cart+' cartões'+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
+ toast('Atualização aplicada: '+n.lanc+' compras/parcelas, '+n.cart+' cartões'+(n.pulou?', '+n.pulou+' já estava'+(n.pulou>1?'m':'')+' lançada'+(n.pulou>1?'s':''):'')+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
 /* compra parcelada que veio da fatura do banco: só categoria e de quem é (o valor é o do banco) */
 function abrirImportada(l){var c=cartao(l.meio)||{},n=+l.parc||1,k0=+l.parcIni||1;
  var h='<h3>'+esc(l.desc||'Compra')+'</h3><div class="sub">'+esc(c.nome||'')+' · compra de '+dlab(l.data)+'</div><div class="card" style="margin-top:10px">'+(n>1?'<div class="kv"><span>Parcela</span><b>'+c2s(l.vParc)+'</b></div><div class="kv"><span>Parcelas</span><b>'+k0+' a '+n+' de '+n+'</b></div><div class="kv"><span>Primeira aqui</span><b>fatura de '+mesNome(l.fat)+'</b></div><div class="kv"><span>Ainda a pagar</span><b>'+c2s(l.vParc*(n-k0+1))+'</b></div>':'<div class="kv"><span>Valor</span><b>'+c2s(l.vParc)+'</b></div><div class="kv"><span>Fatura</span><b>'+mesNome(l.fat)+'</b></div>')+'<div class="sub" style="margin-top:4px">Veio da fatura do banco.</div></div>';
