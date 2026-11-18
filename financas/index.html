@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=78, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=79, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -332,13 +332,12 @@ function itensFatura(cid,ym){
 /* limite: o que ainda está preso no cartão = faturas não pagas (do início do app em diante), com todas as parcelas futuras;
    conta fixa no cartão só entra quando a cobrança já aconteceu (as futuras ainda não usam limite) */
 /* Hudson 18/11: algumas compras parceladas (ex.: Amazon BR 13x no Amazon Bradesco) o banco só desconta do limite quando a parcela fecha na fatura — lanc.limSoFechada */
-function emUsoCartao(cid){var t=hoje(),tot=0,c=cartao(cid),aberta=c?faturaDe(c,t):'';for(var i=0;i<40;i++){var ym=addM(S.inicio,i),x=fatura(cid,ym),f=S.faturas[x.k]||{};
-  var v=f.banco!=null?f.banco:soma(x.its.filter(function(it){return (it.kind==='lanc'||it.data<=t)&&!(it.l&&it.l.limSoFechada&&ym>=aberta)}),function(it){return it.v});tot+=Math.max(0,v-x.pago)}return tot+usoLimExtra(cid)}
-/* Hudson 18/11: o Bradesco Gold (pago por débito automático na conta) divide o limite com o Neo. O que o Gold já cobrou e ainda não foi debitado ocupa o limite do Bradesco.
-   Conta fixa com limCartao:'brad' e diaCompra: a cobrança do mês anterior (diaCompra) fica no limite até o débito (dia da conta fixa). */
-function usoLimExtra(cid){var t=hoje(),tot=0;viv(S.fixas).forEach(function(f){if(f.limCartao!==cid)return;for(var k=0;k<3;k++){var ym=addM(ymOf(t),k);if(!fixaVigente(f,ym)||(S.fixasMes[f.id+'|'+ym]||{}).apagada)continue;
-  var deb=diaNoMes(ym,f.dia||1),cp=diaNoMes(addM(ym,-1),f.diaCompra||1);if(cp<=t&&t<deb)tot+=valorFixa(f,ym)}});return tot}
-function limiteCartao(c){if(!(c.limite>0))return null;var u=emUsoCartao(c.id);return {limite:c.limite,uso:u,disp:c.limite-u,pct:Math.min(100,Math.max(0,u/c.limite*100))}}
+/* Hudson 18/11: cartões que dividem o mesmo limite (Bradesco Neo + Bradesco Gold): o cartão "filho" tem limiteDe = id do principal; o uso de um ocupa o limite dos dois */
+function emUsoCartao(cid){var c0=cartao(cid);if(c0&&c0.limiteDe&&cartao(c0.limiteDe))return emUsoCartao(c0.limiteDe);
+ return _usoCartao(cid)+soma(viv(S.cartoes).filter(function(o){return o.limiteDe===cid}),function(o){return _usoCartao(o.id)})}
+function _usoCartao(cid){var t=hoje(),tot=0,c=cartao(cid),aberta=c?faturaDe(c,t):'';for(var i=0;i<40;i++){var ym=addM(S.inicio,i),x=fatura(cid,ym),f=S.faturas[x.k]||{};
+  var v=f.banco!=null?f.banco:soma(x.its.filter(function(it){return (it.kind==='lanc'||it.data<=t)&&!(it.l&&it.l.limSoFechada&&ym>=aberta)}),function(it){return it.v});tot+=Math.max(0,v-x.pago)}return tot}
+function limiteCartao(c){if(c&&c.limiteDe&&cartao(c.limiteDe))return limiteCartao(cartao(c.limiteDe));if(!(c.limite>0))return null;var u=emUsoCartao(c.id);return {limite:c.limite,uso:u,disp:c.limite-u,pct:Math.min(100,Math.max(0,u/c.limite*100))}}
 function fatura(cid,ym){
  var k=cid+'|'+ym,f=S.faturas[k]||{},its=itensFatura(cid,ym),c=cartao(cid);
  /* Hudson 15/11: conta fixa no cartão só entra na fatura (e no limite) quando chega o dia da cobrança — antes fica em "ainda vai entrar" */
@@ -419,7 +418,7 @@ function itensMes(ym){
   /* Hudson 15/11: o que você pagou ANTES do mês da fatura (adiantado) já saiu no mês em que pagou: aqui só fica o resto */
   var pa=x.pags.filter(function(l){return !l.fora&&l.data&&ymOf(l.data)<ym}),ant=Math.min(x.valor,soma(pa,function(l){return l.valor})),shp=x.valor>0?pv/x.valor:0;
   var rsP=Math.max(0,x.valor+ae-x.pago);
-  out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor+ae-ant,valorFat:x.valor+ae,aEntrar:ae,antes:ant,antesYm:pa.length?ymOf(pa[0].data):'',resta:rsP,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome,status:rsP<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:ant?Math.max(0,pv-Math.round(ant*shp)):pv,paiFat:pv});
+  out.push({kind:'fatura',id:c.id,ym:ym,data:x.vence,sinal:-1,valor:x.valor+ae-ant,valorFat:x.valor+ae,aEntrar:ae,antes:ant,antesYm:pa.length?ymOf(pa[0].data):'',resta:rsP,cert:x.informado?'certo':'estimado',titulo:'Fatura '+c.nome+(c.debAuto?' · débito automático':''),status:rsP<=0?'pago':(atras(x.vence)?'atrasado':'pendente'),pai:ant?Math.max(0,pv-Math.round(ant*shp)):pv,paiFat:pv});
 });
  (function(){var cp=contaPai(ym);if(cp.total>0)out.push({kind:'reemb',id:'pai',ym:ym,data:cp.vence,sinal:1,valor:cp.total,resta:cp.resta,cert:'provavel',titulo:'Reembolso do seu pai (cartões)',status:cp.resta<=0?'pago':'pendente'})})();
  (S.carros||[]).filter(Boolean).forEach(function(car){if(car.del){semanasDoMes(ym,car.diaSem==null?3:+car.diaSem).forEach(function(s){var rs=recebSemana('carro',car.id,s);if(rs.length)out.push({kind:'carro',id:car.id,sem:s,data:s,sinal:1,valor:soma(rs,function(l){return l.valor}),resta:0,cert:'certo',titulo:car.nome,status:'pago',nota:'carro excluído · recebido'})});return}
@@ -1346,16 +1345,16 @@ function excluirConta(id){if(viv(S.lanc).some(function(l){return l.meio===id||l.
 
 /* cartão */
 function abrirCartao(id){var c=id?cartao(id):null;
- abrir('<h3>'+(c?esc(c.nome):'Novo cartão')+'</h3>'+fTxt('kNome','Nome',c?c.nome:'','Ex.: Bradesco')+'<div class="two">'+fNum('kFecha','Dia de fechamento',c?c.fecha:'','ex.: 25')+fNum('kVence','Dia de vencimento',c?c.vence:'','ex.: 1')+'</div>'+fMoney('kLim','Limite total do cartão',c?c.limite:null,'O app calcula o disponível com o que você lança.')+'<p class="help">O fechamento decide em qual fatura cai cada compra. Está no app do banco ("melhor dia de compra" é o dia do fechamento).</p>'+
+ abrir('<h3>'+(c?esc(c.nome):'Novo cartão')+'</h3>'+fTxt('kNome','Nome',c?c.nome:'','Ex.: Bradesco')+'<div class="two">'+fNum('kFecha','Dia de fechamento',c?c.fecha:'','ex.: 25')+fNum('kVence','Dia de vencimento',c?c.vence:'','ex.: 1')+'</div>'+(c&&c.limiteDe&&cartao(c.limiteDe)?'<p class="help">Divide o limite com o '+esc(cartao(c.limiteDe).nome)+(c.debAuto?' · fatura paga por débito automático na conta':'')+'.</p>':fMoney('kLim','Limite total do cartão',c?c.limite:null,'O app calcula o disponível com o que você lança.'))+'<p class="help">O fechamento decide em qual fatura cai cada compra. Está no app do banco ("melhor dia de compra" é o dia do fechamento).</p>'+
   '<button class="btn" onclick="salvarCartao('+(c?"'"+c.id+"'":'null')+')">Salvar</button>'+(c?'<button class="btn red" onclick="excluirCartao(\''+c.id+'\')">Excluir cartão</button>':'')+'<button class="btn sec" onclick="fechar()">Cancelar</button>')}
 function salvarCartao(id){var nome=val('kNome').trim(),fe=parseInt(val('kFecha'),10)||null,ve=parseInt(val('kVence'),10);if(!nome||!(ve>=1&&ve<=31)){toast('Informe nome e dia de vencimento');return}if(fe&&!(fe>=1&&fe<=31)){toast('Dia de fechamento inválido');return}
- var lim=parseBRL(val('kLim')),c=id?cartao(id):null;if(!c)S.cartoes.push({id:uid(),nome:nome,fecha:fe,vence:ve,limite:lim,criado:Date.now()});else editar(c,{nome:nome,fecha:fe,vence:ve,limite:lim});save();fechar();render();toast('Cartão salvo')}
+ var lim=parseBRL(val('kLim')),c=id?cartao(id):null;if(!c)S.cartoes.push({id:uid(),nome:nome,fecha:fe,vence:ve,limite:lim,criado:Date.now()});else editar(c,c.limiteDe?{nome:nome,fecha:fe,vence:ve}:{nome:nome,fecha:fe,vence:ve,limite:lim});save();fechar();render();toast('Cartão salvo')}
 function excluirCartao(id){if(viv(S.lanc).some(function(l){return l.meio===id})||viv(S.fixas).some(function(f){return f.meio===id})){toast('O cartão tem compras ou contas ligadas; não dá para excluir');return}if(!confirm('Excluir este cartão?'))return;editar(cartao(id),{del:true});save();fechar();render()}
 
 /* fatura */
 function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
  var h='<h3>Fatura '+esc(x.nome)+' · '+mesNome(ym)+'</h3><div class="sub">Vence '+dlab(x.vence)+(x.informado?'':' · valor estimado pelas compras')+'</div>';
- h+=blocoPagar('fatura',cid,ym,x.resta,x.vence);
+ var cD=cartao(cid);if(cD&&cD.debAuto&&x.resta>0)h+='<div class="card" style="margin-top:10px"><div class="kv"><span>💳 Débito automático</span><b>'+dcurto(x.vence)+'</b></div><div class="sub">O banco tira '+c2s(x.resta)+' da '+esc((conta(cD.contaDeb)||{}).nome||'conta')+' no vencimento. O app registra sozinho nesse dia — não precisa tocar em nada.</div></div>';else h+=blocoPagar('fatura',cid,ym,x.resta,x.vence);
  if(x.resta>0&&optContas().length)h+='<button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirPagFat(\''+cid+'\',\''+ym+'\')">Pagar só uma parte, outra data ou outra conta</button>';
  h+=maisOpcoes(fMoney('fBanco','Valor que o banco cobra',f.banco,'Deixe vazio para usar a soma dos itens lançados ('+c2s(x.soma)+').')+
   (x.pago>0?fSel('fLiq','Esse valor do banco…',[['tot','É o total da fatura (antes dos pagamentos)'],['liq','Já desconta o que paguei ('+c2s(x.pago)+')']],'tot','O app do banco costuma mostrar o valor já descontando o que você pagou.'):'')+
@@ -1590,6 +1589,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  if(!confirm((d.resumo||'Aplicar a atualização?')+(ja.length?'\n\nAtenção: você já tinha '+ja.length+' compra(s) lançada(s) nesses cartões; elas continuam e podem estar repetidas no total à vista.':'')+'\n\nNada do que você lançou é apagado.'))return;
  try{localStorage.setItem(KEY+'_antes_atualizacao',JSON.stringify(S))}catch(e){}
  var n={cart:0,lanc:0,fix:0,av:0,car:0,pag:0};
+ (d.cartoesNovos||[]).forEach(function(o){if(cartao(o.id))return;S.cartoes.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.cart++});
  (d.cartoes||[]).forEach(function(o){var c=cartao(o.id);var p={};['nome','fecha','vence','limite'].forEach(function(k){if(o[k]!==undefined)p[k]=o[k]});if(c&&c.fecha&&o.fechaSoSeVazio){delete p.fecha;
    /* a atualização antiga trocou o dia de fechamento que você tinha posto: devolve o seu */
    if(o.fechaVelha&&c.fecha===o.fechaVelha&&c.hist){for(var hi=c.hist.length-1;hi>=0;hi--){var pv=c.hist[hi].prev||{};if(pv.fecha!=null&&pv.fecha!==o.fechaVelha){p.fecha=pv.fecha;break}}}}if(c&&c.vence&&o.fechaSoSeVazio)delete p.vence;
@@ -1610,7 +1610,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  (d.semanas||[]).forEach(function(o){var re=new RegExp(o.carro,'i'),car=viv(S.carros).filter(function(c){return re.test(c.nome)})[0];if(!car)return;var key=car.id+'|'+o.W;if(S.semanas[key]&&S.semanas[key].imp===d.id)return;S.semanas[key]=Object.assign({},S.semanas[key]||{},o.patch,{imp:d.id,at:Date.now()})});
  (d.removerAvulsas||[]).forEach(function(id){var a=porId(S.avulsas,id);if(a&&!a.del)editar(a,{del:true})});
  (d.substitui||[]).forEach(function(i){S.atualizacoesVelhas[i]=Date.now()});
- S.atualizacoes[d.id]=Date.now();save();M=mesPadrao();render();
+ S.atualizacoes[d.id]=Date.now();try{debitoAuto()}catch(e){}save();M=mesPadrao();render();
  toast('Atualização aplicada: '+[n.lanc?n.lanc+' compra'+(n.lanc>1?'s':'')+' nova'+(n.lanc>1?'s':''):'',n.ed?n.ed+' corrigida'+(n.ed>1?'s':''):'',n.fix?n.fix+' conta'+(n.fix>1?'s':'')+' fixa'+(n.fix>1?'s':''):'',n.cart?n.cart+' cartão'+(n.cart>1?'ões':''):''].filter(Boolean).join(', ')+(n.pulou?', '+n.pulou+' já estava'+(n.pulou>1?'m':'')+' lançada'+(n.pulou>1?'s':''):'')+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
 /* compra parcelada que veio da fatura do banco: só categoria e de quem é (o valor é o do banco) */
 function abrirImportada(l){var c=cartao(l.meio)||{},n=+l.parc||1,k0=+l.parcIni||1;
@@ -1748,6 +1748,12 @@ function importarArquivo(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)r
   if(!vazio()){try{localStorage.setItem(KEY+'_antes_import',JSON.stringify(S))}catch(e){}}
   delete d._ext;S=norm(d);migra();M=mesPadrao();save();render();toast('Dados carregados')}catch(e){toast('⚠️ '+e.message)}};r.readAsText(f)}
 /* ajustes únicos nos dados (não apaga nada) */
+/* Hudson 18/11: fatura paga por débito automático em conta (ex.: Bradesco Gold). No dia do vencimento o app registra o pagamento sozinho, saindo da conta escolhida no cartão. */
+function debitoAuto(){var t=hoje(),feitos=[];viv(S.cartoes).forEach(function(c){if(!c.debAuto)return;var conta=c.contaDeb||(viv(S.contas)[0]||{}).id;if(!conta)return;
+  for(var k=-3;k<=1;k++){var ym=addM(ymOf(t),k);if(c.debAutoDesde&&ym<c.debAutoDesde)continue;var x=fatura(c.id,ym),id='auto|'+x.k;
+   if(x.vence>t||x.valor<=0||x.resta<=0||porId(S.lanc,id))continue;
+   S.lanc.push({id:id,tipo:'pagfatura',ref:x.k,valor:x.resta,meio:conta,data:x.vence,auto:true,criado:Date.now(),at:Date.now()});feitos.push(c.nome+' '+c2s(x.resta))}});
+ if(feitos.length){save();setTimeout(function(){toast('Débito automático registrado: '+feitos.join(', '))},600)}return feitos.length}
 function migra(){if(vazio())return;/* nunca grava por cima com o app vazio (protege a cópia interna) */var mud=false;if(!S.classDesde){S.classDesde=window.__CLASS_DESDE||Date.now();mud=true}if(!S.mig1){viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.cat==='Transporte'&&/posto|gasolina|etanol|combust|gnv|aleluia|osorio|tiririca|nossa senho/i.test(l.desc||'')){l.cat='Combustível';mud=true}});S.mig1=1;mud=true}if(mud)save()}
 function mesPadrao(){var m=ymOf(hoje());return S.inicio>m?S.inicio:m}
 
@@ -1964,7 +1970,7 @@ function vCartoes(){var h=mnav(),cs=viv(S.cartoes);
  if(!cs.length)return h+'<div class="card"><div class="empty">Nenhum cartão.</div><button class="btn" onclick="abrirCartao()">Cadastrar cartão</button></div>';
  var tot=0;h+=cardClass();
  var pagT=0,resT=0;cs.forEach(function(c){var x=fatura(c.id,M),L=limiteCartao(c);tot+=x.valor;pagT+=Math.min(x.pago,x.valor);resT+=x.resta;
-  h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':'vence '+dcurto(x.vence))+'</span></div><div class="amt">'+(x.pago>0&&x.resta>0?c2s(x.resta)+'<small>falta</small>':c2s(x.valor))+'</div>'+
+  h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':(c.debAuto?'débito automático ':'vence ')+dcurto(x.vence))+'</span></div><div class="amt">'+(x.pago>0&&x.resta>0?c2s(x.resta)+'<small>falta</small>':c2s(x.valor))+'</div>'+
    '<div class="l1"><span>'+(function(){var pv=paiVisivel(c.id,M,x),b=[];if(x.pago>0&&x.resta>0)b.push('pago '+c2s(x.pago)+' de '+c2s(x.valor));
     if(pv>0)b.push(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv));else if(!x.informado&&!b.length)b.push('estimada');return b.join(' · ')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
  var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
@@ -2259,7 +2265,7 @@ function clSubAtualiza(){var e=document.getElementById('clSub');if(e)e.innerHTML
 function clSub(x){CLF.sub=CLF.sub===x?'':x;CLF.subMan=true;clSubAtualiza()}
 function impSub(x){impLer();var cur=IMP.subMan?IMP.sub:(IMP.sub||subPrevio(IMP.desc)||sugSub(IMP.desc));IMP.sub=cur===x?'':x;IMP.subMan=true;impDesenha()}
 /* ---------- início ---------- */
-S=load();migra();M=mesPadrao();ML=ymOf(hoje());render();
+S=load();migra();try{if(!vazio())debitoAuto()}catch(e){}M=mesPadrao();ML=ymOf(hoje());render();
 if(vazio())idbGet(function(j){if(!j)return;try{var d=norm(JSON.parse(j));if(d.lanc.length||d.contas.length||d.cartoes.length){S=d;migra();M=mesPadrao();try{localStorage.setItem(KEY,j)}catch(e){}render();toast('Dados recuperados da cópia interna')}}catch(e){}});
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
@@ -2271,7 +2277,7 @@ setTimeout(function(){checaVersao(false)},1200);document.addEventListener('visib
 var _ultExt=0;function extTalvez(){if(extChave()&&Date.now()-_ultExt>60*1000){_ultExt=Date.now();extSync(false)}}
 try{if(syncNomesGestao(EXT.carros))render()}catch(e){}
 setTimeout(extTalvez,800);
-var _diaAberto=hoje();document.addEventListener('visibilitychange',function(){if(!document.hidden){if(hoje()!==_diaAberto){_diaAberto=hoje();M=mesPadrao();ML=ymOf(hoje())}render();extTalvez()}});
+var _diaAberto=hoje();document.addEventListener('visibilitychange',function(){if(!document.hidden){if(hoje()!==_diaAberto){_diaAberto=hoje();M=mesPadrao();ML=ymOf(hoje())}try{debitoAuto()}catch(e){}render();extTalvez()}});
 </script>
 <script>
 var PIX_CFG={sel:'input.money'};
