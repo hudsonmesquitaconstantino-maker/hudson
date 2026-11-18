@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=76, APP_DATE='17/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=77, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -332,7 +332,11 @@ function itensFatura(cid,ym){
 /* limite: o que ainda está preso no cartão = faturas não pagas (do início do app em diante), com todas as parcelas futuras;
    conta fixa no cartão só entra quando a cobrança já aconteceu (as futuras ainda não usam limite) */
 function emUsoCartao(cid){var t=hoje(),tot=0;for(var i=0;i<40;i++){var ym=addM(S.inicio,i),x=fatura(cid,ym),f=S.faturas[x.k]||{};
-  var v=f.banco!=null?f.banco:soma(x.its.filter(function(it){return it.kind==='lanc'||it.data<=t}),function(it){return it.v});tot+=Math.max(0,v-x.pago)}return tot}
+  var v=f.banco!=null?f.banco:soma(x.its.filter(function(it){return it.kind==='lanc'||it.data<=t}),function(it){return it.v});tot+=Math.max(0,v-x.pago)}return tot+usoLimExtra(cid)}
+/* Hudson 18/11: o Bradesco Gold (pago por débito automático na conta) divide o limite com o Neo. O que o Gold já cobrou e ainda não foi debitado ocupa o limite do Bradesco.
+   Conta fixa com limCartao:'brad' e diaCompra: a cobrança do mês anterior (diaCompra) fica no limite até o débito (dia da conta fixa). */
+function usoLimExtra(cid){var t=hoje(),tot=0;viv(S.fixas).forEach(function(f){if(f.limCartao!==cid)return;for(var k=0;k<3;k++){var ym=addM(ymOf(t),k);if(!fixaVigente(f,ym)||(S.fixasMes[f.id+'|'+ym]||{}).apagada)continue;
+  var deb=diaNoMes(ym,f.dia||1),cp=diaNoMes(addM(ym,-1),f.diaCompra||1);if(cp<=t&&t<deb)tot+=valorFixa(f,ym)}});return tot}
 function limiteCartao(c){if(!(c.limite>0))return null;var u=emUsoCartao(c.id);return {limite:c.limite,uso:u,disp:c.limite-u,pct:Math.min(100,Math.max(0,u/c.limite*100))}}
 function fatura(cid,ym){
  var k=cid+'|'+ym,f=S.faturas[k]||{},its=itensFatura(cid,ym),c=cartao(cid);
@@ -1592,7 +1596,7 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  (d.faturas||[]).forEach(function(o){var f=S.faturas[o.k]||(S.faturas[o.k]={});if('banco' in o)editar(f,{banco:o.banco});if('pai' in o)editar(f,{pai:o.pai})});
  (d.lanc||[]).forEach(function(o){var l=porId(S.lanc,o.id);if(l){if(l.del)return;var pt=Object.assign({},o);delete pt.id;delete pt.cat;delete pt.de;delete pt.pularSeJaTem;editar(l,pt);n.ed=(n.ed||0)+1;return}
   /* Hudson 17/11: compra que você já lançou à mão (mesmo cartão, mesmo valor, até 3 dias de diferença) não entra de novo */
-  if(o.pularSeJaTem&&viv(S.lanc).some(function(x){return x.tipo==='gasto'&&x.meio===o.meio&&!x.imp&&Math.abs((+x.valor||0)-(+o.valor||0))<1&&Math.abs(new Date(x.data+'T12:00')-new Date(o.data+'T12:00'))<=3*864e5})){n.pulou=(n.pulou||0)+1;return}
+  if(o.pularSeJaTem&&(viv(S.lanc).some(function(x){return x.tipo==='gasto'&&x.meio===o.meio&&!x.imp&&Math.abs((+x.valor||0)-(+o.valor||0))<1&&Math.abs(new Date(x.data+'T12:00')-new Date(o.data+'T12:00'))<=3*864e5})||viv(S.fixas).some(function(f){if(f.meio!==o.meio||Math.abs((+f.valor||0)-(+o.valor||0))>=1)return false;var ym=ymOf(o.data);return [-1,0,1].some(function(k){var mm=addM(ym,k);return fixaVigente(f,mm)&&Math.abs(new Date(diaNoMes(mm,f.dia||1)+'T12:00')-new Date(o.data+'T12:00'))<=3*864e5})}))){n.pulou=(n.pulou||0)+1;return}
   var nv=Object.assign({criado:Date.now(),at:Date.now()},o);delete nv.pularSeJaTem;S.lanc.push(nv);n.lanc++});
  (d.removerFixas||[]).forEach(function(id){var f=porId(S.fixas,id);if(f&&!f.del)editar(f,{del:true})});
  (d.fixasNovas||[]).forEach(function(o){if(porId(S.fixas,o.id))return;S.fixas.push(Object.assign({criado:Date.now()},o));n.fix++});
