@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=79, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=80, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1905,6 +1905,57 @@ function rowN(x,o){o=o||{};var t=hoje(),d=o.data||x.dataOrig||x.data,atr=o.atr!=
 function secN(tit,body,link){return '<div class="sec"><div class="sech"><span>'+tit+'</span>'+(link||'')+'</div><div class="card cn">'+body+'</div></div>'}
 
 /* ---------- HOJE ---------- */
+/* ================= v80 (Hudson 18/11): LIMITES DE TODOS OS CARTÕES JUNTOS + QUAL CARTÃO USAR HOJE =================
+   Limite compartilhado (Gold dentro do Neo) conta uma vez só. O "cartão para usar hoje" é o que deixa pagar mais tarde
+   (compra de hoje cai na fatura que vence mais longe); cartão com menos de R$ 300 livres vai para o fim da fila. */
+var CT='faturas',LIM_BAIXO=30000;
+/* cor sólida de cada cartão nos gráficos de limite: tons bem diferentes entre si (Bradesco e Santander são os dois vermelhos no cartão) */
+function _corSol(c){var n=String(c.nome).toLowerCase();if(/amazon/.test(n))return '#5B8DEF';if(/bradesco/.test(n))return '#E0453C';if(/santander/.test(n))return '#C2367F';if(/ita[uú]/.test(n))return '#F28C28';if(/nubank|nu\b/.test(n))return '#8A3FDB';return '#2BA884'}
+function cartoesPrinc(){return viv(S.cartoes).filter(function(c){return !(c.limiteDe&&cartao(c.limiteDe))})}
+function limitesJuntos(){var rows=[],lim=0,uso=0;cartoesPrinc().forEach(function(c){var L=limiteCartao(c);rows.push({c:c,L:L,filhos:viv(S.cartoes).filter(function(o){return o.limiteDe===c.id})});if(L){lim+=L.limite;uso+=Math.max(0,L.uso)}});return {rows:rows,lim:lim,uso:uso,disp:lim-uso}}
+function rankCartoes(){var t=hoje(),out=[];cartoesPrinc().forEach(function(c){var ym=faturaDe(c,t),x=fatura(c.id,ym),ve=x.vence||diaNoMes(ym,+c.vence||1),L=limiteCartao(c);
+  out.push({c:c,ym:ym,vence:ve,dias:diffD(t,ve),L:L,baixo:!!(L&&L.disp<LIM_BAIXO),fecha:+c.fecha||0})});
+ out.sort(function(a,b){if(a.baixo!==b.baixo)return a.baixo?1:-1;if(b.dias!==a.dias)return b.dias-a.dias;return (b.L?b.L.disp:1e12)-(a.L?a.L.disp:1e12)});return out}
+function _rkLinha(r,i){var c=r.c,t=hoje();
+ return '<div class="rkR'+(r.baixo?' baixo':'')+'"><div class="rkN" style="background:'+corCartao(c)+'">'+(i+1)+'</div><div class="g"><b>'+esc(c.nome)+(i===0&&!r.baixo?' <span class="rkTag">use este</span>':'')+(r.baixo?' <span class="rkTag red">pouco limite</span>':'')+'</b>'+
+  '<span>Compra de hoje vence '+dcurto(r.vence)+' · '+r.dias+' dias para pagar</span>'+
+  '<span class="mut">'+(r.L?'livre '+c2s(r.L.disp):'limite não informado')+(r.fecha?' · melhor dia de compra: dia '+r.fecha+(r.fecha===+t.slice(8,10)?' (hoje)':''):'')+'</span></div></div>'}
+function cardUsarHoje(){var r=rankCartoes();if(!r.length)return '';var b=r[0];
+ if(b.baixo)return '<div class="uh tap baixo" onclick="abrirUsarHoje()"><div class="uhI">⚠️</div><div class="g"><span class="uhL">Cartão para usar hoje</span><b>Todos com pouco limite</b><span>nenhum cartão com mais de '+c2s(LIM_BAIXO)+' livres</span></div><div class="ch">›</div></div>';
+ return '<div class="uh tap" onclick="abrirUsarHoje()"><div class="uhI" style="background:'+corCartao(b.c)+'">💳</div><div class="g"><span class="uhL">Cartão para usar hoje</span><b>'+esc(b.c.nome)+'</b><span>paga só '+dcurto(b.vence)+' · '+b.dias+' dias'+(b.L?' · livre '+c2s(b.L.disp):'')+'</span></div><div class="ch">›</div></div>'}
+function abrirUsarHoje(){var r=rankCartoes();
+ abrir('<h3>Qual cartão usar hoje</h3><p class="help" style="margin-top:-4px">O primeiro é o que deixa você pagar mais tarde: a compra de hoje cai na fatura que vence mais longe. Cartão com menos de '+c2s(LIM_BAIXO)+' livres vai para o fim da fila.</p>'+
+  '<div class="card cn">'+r.map(_rkLinha).join('')+'</div><button class="btn sec" onclick="fechar();CT=\'limites\';go(\'cartoes\')">Ver os limites de todos os cartões</button><button class="btn sec" onclick="fechar()">Fechar</button>')}
+function segCT(){return '<div class="seg">'+[['faturas','Faturas'],['limites','Limites']].map(function(o){return '<button class="'+(CT===o[0]?'on':'')+'" onclick="CT=\''+o[0]+'\';render()">'+o[1]+'</button>'}).join('')+'</div>'}
+function vLimites(){var J=limitesJuntos(),h=segCT();
+ if(J.lim>0){var pu=Math.min(100,Math.max(0,J.uso/J.lim*100));
+  h+='<div class="limH"><div class="lb">Livre em todos os cartões</div><div class="val">'+c2s(J.disp)+'</div><div class="limBar"><i style="width:'+pu.toFixed(1)+'%"></i></div><div class="limS"><span>usado '+c2s(J.uso)+' · '+Math.round(pu)+'%</span><span>limite total '+c2s(J.lim)+'</span></div>'+
+   '<div class="limMix">'+J.rows.filter(function(r){return r.L&&r.L.disp>0}).map(function(r){return '<i style="flex:'+r.L.disp+';background:'+_corSol(r.c)+'" title="'+esc(r.c.nome)+'"></i>'}).join('')+'</div><div class="limLeg">'+J.rows.filter(function(r){return r.L&&r.L.disp>0}).map(function(r){return '<span><i style="background:'+_corSol(r.c)+'"></i>'+esc(r.c.nome)+' '+Math.round(r.L.disp/J.disp*100)+'%</span>'}).join('')+'</div><div class="limS" style="margin-top:2px"><span>de onde vem o limite livre</span></div></div>'}
+ h+=secN('Cada cartão',J.rows.map(function(r){var c=r.c,L=r.L,cor=_corSol(c);
+  if(!L)return '<div class="limR tap" onclick="abrirCartao(\''+c.id+'\')"><div class="limT"><span class="dot" style="background:'+cor+'"></span><b>'+esc(c.nome)+'</b></div><div class="limS"><span class="mut">limite não informado · toque para informar</span></div></div>';
+  var pu=Math.min(100,Math.max(0,L.uso/L.limite*100)),baixo=L.disp<LIM_BAIXO;
+  return '<div class="limR tap" onclick="CT=\'faturas\';abrirFatura(\''+c.id+'\',faturaDe(cartao(\''+c.id+'\'),hoje()))"><div class="limT"><span class="dot" style="background:'+cor+'"></span><b>'+esc(c.nome)+'</b>'+(baixo?'<span class="rkTag red">pouco limite</span>':'')+'<em>'+Math.round(L.limite/J.lim*100)+'% do limite total</em></div>'+
+   '<div class="limBar sm"><i style="width:'+pu.toFixed(1)+'%;background:'+cor+'"></i></div>'+
+   '<div class="limS"><span>usado '+c2s(Math.max(0,L.uso))+' de '+c2s(L.limite)+' · '+Math.round(pu)+'%</span><b class="'+(baixo?'neg':'pos')+'">livre '+c2s(L.disp)+'</b></div>'+
+   '<div class="limS mut"><span>'+(c.fecha?'fecha dia '+c.fecha+' · ':'')+'vence dia '+(c.vence||'?')+(c.fecha?' · melhor dia de compra: dia '+c.fecha:'')+'</span></div>'+
+   (r.filhos.length?'<div class="limS mut"><span>divide o limite com '+r.filhos.map(function(o){return esc(o.nome)}).join(', ')+'</span></div>':'')+'</div>'}).join(''));
+ h+=secN('Para usar hoje',rankCartoes().map(_rkLinha).join(''));
+ return h}
+(function(){if(document.getElementById('limCss'))return;var st=document.createElement('style');st.id='limCss';st.textContent=
+ '.uh{display:flex;align-items:center;gap:12px;border-radius:18px;padding:12px 14px;margin:0 0 12px;background:var(--card);box-shadow:var(--sh)}.uh .g{flex:1;min-width:0}.uh .uhL{display:block;font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px}'+
+ '.uh b{display:block;font-size:17px}.uh .g>span:last-child{display:block;font-size:13.5px;color:var(--tx2);line-height:1.35}.uh .ch{font-size:22px;color:var(--tx3)}'+
+ '.uhI{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;background:var(--chip)}.uh.baixo{background:var(--yel2)}.uh.baixo b{color:var(--yel)}'+
+ '.rkR{display:flex;gap:12px;align-items:flex-start;padding:11px 0}.rkR+.rkR{border-top:1px solid var(--line)}.rkR .g{flex:1;min-width:0}.rkR b{display:block;font-size:15.5px}.rkR span{display:block;font-size:13px;color:var(--tx2);margin-top:2px}.rkR .mut{color:var(--tx3)}.rkR.baixo{opacity:.75}'+
+ '.rkN{width:28px;height:28px;border-radius:50%;color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px}'+
+ '.rkTag{display:inline-block!important;font-size:11px!important;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--grn2);color:var(--grn)!important;margin:0 0 0 6px!important;vertical-align:2px}.rkTag.red{background:var(--red2);color:var(--red)!important}'+
+ '.limH{border-radius:24px;padding:18px;margin:12px 0;background:var(--card);box-shadow:var(--sh)}.limH .lb{font-size:13px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px}.limH .val{font-size:34px;font-weight:800;letter-spacing:-.6px;margin:2px 0 10px}'+
+ '.limBar{height:10px;border-radius:6px;background:var(--chip);overflow:hidden}.limBar i{display:block;height:100%;border-radius:6px;background:var(--acc)}.limBar.sm{height:7px;margin:8px 0 6px}'+
+ '.limS{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--tx2);margin-top:6px}.limS.mut,.limS .mut{color:var(--tx3);font-size:12.5px;margin-top:3px}.limS b{font-size:14px;white-space:nowrap}'+
+ '.limMix{display:flex;gap:2px;height:12px;margin-top:14px;border-radius:6px;overflow:hidden}.limMix i{display:block;height:100%}'+
+ '.limLeg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12.5px;color:var(--tx2)}.limLeg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}'+
+ '.limR{padding:12px 0}.limR+.limR{border-top:1px solid var(--line)}.limT{display:flex;align-items:center;gap:8px}.limT b{font-size:15.5px}.limT em{margin-left:auto;font-style:normal;font-size:12.5px;color:var(--tx3);white-space:nowrap}.limT .dot{width:10px;height:10px;border-radius:50%;flex:none}.limT .rkTag{margin:0!important}';
+ document.head.appendChild(st)})();
+
 function vHoje(){
  if(vazio())return '<div class="hero"><div class="lb">Bem-vindo</div><div class="val" style="font-size:28px">Seu financeiro</div><button class="hbtn" onclick="document.getElementById(\'arq\').click()">Carregar arquivo</button></div>';
  var t=hoje(),fim=addD(addM(ymOf(t),1)+'-01',-1),p=projecaoAte(addD(t,30)>fim?addD(t,30):fim),h='';
@@ -1915,6 +1966,7 @@ function vHoje(){
  if(p.saldo!=null){var fa=p.outs.filter(function(o){return o.saldo<0&&o.x.resta>0})[0];
   if(fa)h+='<div class="falta tap" onclick="'+acaoItem(fa.x)+'"><div class="ic">!</div><div class="g"><b>Falta '+c2s(-fa.saldo)+'</b><span>'+esc(fa.x.titulo)+' · '+dcurto(fa.x.atrasado?fa.x.dataOrig:fa.data)+' · '+faltaTxt(fa.x.atrasado?fa.x.dataOrig:fa.data)+'</span></div><div class="ch">›</div></div>'}
  h+=resumoHoje();
+ try{h+=cardUsarHoje()}catch(e){}
  h+=cardClass();
  /* receber e cobrar */
  var rec=receberHoje();if(rec.length){var tr=soma(rec,function(r){return r.v});
@@ -1966,7 +2018,7 @@ function vAgenda(){if(['tudo','entradas','saidas'].indexOf(AG)<0)AG='tudo';
  return h}
 
 /* ---------- CARTÕES ---------- */
-function vCartoes(){var h=mnav(),cs=viv(S.cartoes);
+function vCartoes(){if(CT==='limites'&&viv(S.cartoes).length)return vLimites();var h=segCT()+mnav(),cs=viv(S.cartoes);
  if(!cs.length)return h+'<div class="card"><div class="empty">Nenhum cartão.</div><button class="btn" onclick="abrirCartao()">Cadastrar cartão</button></div>';
  var tot=0;h+=cardClass();
  var pagT=0,resT=0;cs.forEach(function(c){var x=fatura(c.id,M),L=limiteCartao(c);tot+=x.valor;pagT+=Math.min(x.pago,x.valor);resT+=x.resta;
