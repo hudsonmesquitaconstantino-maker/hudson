@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=80, APP_DATE='18/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=81, APP_DATE='19/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -1352,8 +1352,15 @@ function salvarCartao(id){var nome=val('kNome').trim(),fe=parseInt(val('kFecha')
 function excluirCartao(id){if(viv(S.lanc).some(function(l){return l.meio===id})||viv(S.fixas).some(function(f){return f.meio===id})){toast('O cartão tem compras ou contas ligadas; não dá para excluir');return}if(!confirm('Excluir este cartão?'))return;editar(cartao(id),{del:true});save();fechar();render()}
 
 /* fatura */
+/* v81 (Hudson 19/11): dois cartões do mesmo banco e do mesmo limite viram UM cartão no app (ex.: Bradesco Neo + Gold).
+   Os itens do segundo cartão têm cartaoSub (ex.: 'Gold'); a fatura mostra o total e quanto é de cada um. Pagar paga os dois juntos. */
+function subsFatura(x){var m={},t=0;(x.its||[]).concat(x.futs||[]).forEach(function(i){var o=i.l||i.f;if(o&&o.cartaoSub){m[o.cartaoSub]=(m[o.cartaoSub]||0)+i.v;t+=i.v}});return {m:m,t:t}}
+function blocoSubs(cid,x){var sb=subsFatura(x);if(!sb.t)return '';var c=cartao(cid)||{},pr=c.subPrincipal||'principal',tot=x.valor+(x.aEntrar||0);
+ return '<div class="card" style="margin-top:10px"><div class="kv"><span>💳 '+esc(pr)+'</span><b>'+c2s(tot-sb.t)+'</b></div>'+Object.keys(sb.m).map(function(k){return '<div class="kv"><span>💳 '+esc(k)+'</span><b>'+c2s(sb.m[k])+'</b></div>'}).join('')+
+  '<div class="kv"><span><b>Total dos dois</b></span><b>'+c2s(tot)+'</b></div><div class="sub">São dois cartões com o mesmo limite. No banco vêm em PDFs separados'+(sb.m.Gold?' (o Gold sai por débito automático)':'')+'; aqui contam e pagam juntos.</div></div>'}
 function abrirFatura(cid,ym){var x=fatura(cid,ym),f=S.faturas[x.k]||{};
  var h='<h3>Fatura '+esc(x.nome)+' · '+mesNome(ym)+'</h3><div class="sub">Vence '+dlab(x.vence)+(x.informado?'':' · valor estimado pelas compras')+'</div>';
+ h+=blocoSubs(cid,x);
  var cD=cartao(cid);if(cD&&cD.debAuto&&x.resta>0)h+='<div class="card" style="margin-top:10px"><div class="kv"><span>💳 Débito automático</span><b>'+dcurto(x.vence)+'</b></div><div class="sub">O banco tira '+c2s(x.resta)+' da '+esc((conta(cD.contaDeb)||{}).nome||'conta')+' no vencimento. O app registra sozinho nesse dia — não precisa tocar em nada.</div></div>';else h+=blocoPagar('fatura',cid,ym,x.resta,x.vence);
  if(x.resta>0&&optContas().length)h+='<button class="btn sec" onclick="filho(\'abrirFatura\',\''+cid+'\',\''+ym+'\');abrirPagFat(\''+cid+'\',\''+ym+'\')">Pagar só uma parte, outra data ou outra conta</button>';
  h+=maisOpcoes(fMoney('fBanco','Valor que o banco cobra',f.banco,'Deixe vazio para usar a soma dos itens lançados ('+c2s(x.soma)+').')+
@@ -1589,8 +1596,13 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  if(!confirm((d.resumo||'Aplicar a atualização?')+(ja.length?'\n\nAtenção: você já tinha '+ja.length+' compra(s) lançada(s) nesses cartões; elas continuam e podem estar repetidas no total à vista.':'')+'\n\nNada do que você lançou é apagado.'))return;
  try{localStorage.setItem(KEY+'_antes_atualizacao',JSON.stringify(S))}catch(e){}
  var n={cart:0,lanc:0,fix:0,av:0,car:0,pag:0};
+ /* v81: juntar um cartão dentro de outro do mesmo limite: {"de":"gold","para":"brad","sub":"Gold"} — compras, contas fixas e pagamentos vão para o cartão principal (marcados com o nome do sub) e o cartão de origem sai do app */
+ (d.cartoesJuntar||[]).forEach(function(o){var de=cartao(o.de),pa=cartao(o.para);if(!de||!pa||de.del)return;var sub=o.sub||de.nome;
+  viv(S.lanc).forEach(function(l){if(l.tipo==='gasto'&&l.meio===o.de){editar(l,{meio:o.para,cartaoSub:l.cartaoSub||sub});n.ed++}else if(l.tipo==='pagfatura'&&String(l.ref||'').indexOf(o.de+'|')===0){editar(l,{ref:o.para+String(l.ref).slice(o.de.length)});n.ed++}});
+  (S.fixas||[]).forEach(function(f){if(f&&f.meio===o.de){editar(f,{meio:o.para,cartaoSub:f.cartaoSub||sub});n.fix++}});
+  editar(de,{del:true});n.cart++});
  (d.cartoesNovos||[]).forEach(function(o){if(cartao(o.id))return;S.cartoes.push(Object.assign({criado:Date.now(),at:Date.now()},o));n.cart++});
- (d.cartoes||[]).forEach(function(o){var c=cartao(o.id);var p={};['nome','fecha','vence','limite'].forEach(function(k){if(o[k]!==undefined)p[k]=o[k]});if(c&&c.fecha&&o.fechaSoSeVazio){delete p.fecha;
+ (d.cartoes||[]).forEach(function(o){var c=cartao(o.id);var p={};['nome','fecha','vence','limite','subPrincipal'].forEach(function(k){if(o[k]!==undefined)p[k]=o[k]});if(c&&c.fecha&&o.fechaSoSeVazio){delete p.fecha;
    /* a atualização antiga trocou o dia de fechamento que você tinha posto: devolve o seu */
    if(o.fechaVelha&&c.fecha===o.fechaVelha&&c.hist){for(var hi=c.hist.length-1;hi>=0;hi--){var pv=c.hist[hi].prev||{};if(pv.fecha!=null&&pv.fecha!==o.fechaVelha){p.fecha=pv.fecha;break}}}}if(c&&c.vence&&o.fechaSoSeVazio)delete p.vence;
   if(!c){if(!o.nome)return;S.cartoes.push(Object.assign({id:o.id,criado:Date.now()},p))}else{if(c.del)p.del=false;if(o.nomeSoSeVazio&&c.nome)delete p.nome;editar(c,p)}n.cart++});
@@ -1610,8 +1622,9 @@ function aplicarAtualizacao(d){S.atualizacoes=S.atualizacoes||{};S.atualizacoesV
  (d.semanas||[]).forEach(function(o){var re=new RegExp(o.carro,'i'),car=viv(S.carros).filter(function(c){return re.test(c.nome)})[0];if(!car)return;var key=car.id+'|'+o.W;if(S.semanas[key]&&S.semanas[key].imp===d.id)return;S.semanas[key]=Object.assign({},S.semanas[key]||{},o.patch,{imp:d.id,at:Date.now()})});
  (d.removerAvulsas||[]).forEach(function(id){var a=porId(S.avulsas,id);if(a&&!a.del)editar(a,{del:true})});
  (d.substitui||[]).forEach(function(i){S.atualizacoesVelhas[i]=Date.now()});
+ (d.cartoesDel||[]).forEach(function(id){var c=cartao(id);if(c&&!c.del){editar(c,{del:true});n.cart++}});
  S.atualizacoes[d.id]=Date.now();try{debitoAuto()}catch(e){}save();M=mesPadrao();render();
- toast('Atualização aplicada: '+[n.lanc?n.lanc+' compra'+(n.lanc>1?'s':'')+' nova'+(n.lanc>1?'s':''):'',n.ed?n.ed+' corrigida'+(n.ed>1?'s':''):'',n.fix?n.fix+' conta'+(n.fix>1?'s':'')+' fixa'+(n.fix>1?'s':''):'',n.cart?n.cart+' cartão'+(n.cart>1?'ões':''):''].filter(Boolean).join(', ')+(n.pulou?', '+n.pulou+' já estava'+(n.pulou>1?'m':'')+' lançada'+(n.pulou>1?'s':''):'')+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
+ toast('Atualização aplicada: '+[n.lanc?n.lanc+' compra'+(n.lanc>1?'s':'')+' nova'+(n.lanc>1?'s':''):'',n.ed?n.ed+' corrigida'+(n.ed>1?'s':''):'',n.fix?n.fix+' conta'+(n.fix>1?'s':'')+' fixa'+(n.fix>1?'s':''):'',n.cart?n.cart+(n.cart>1?' cartões':' cartão'):''].filter(Boolean).join(', ')+(n.pulou?', '+n.pulou+' já estava'+(n.pulou>1?'m':'')+' lançada'+(n.pulou>1?'s':''):'')+(n.av?', '+n.av+' a receber':'')+(n.pag?', fatura marcada paga':''))}
 /* compra parcelada que veio da fatura do banco: só categoria e de quem é (o valor é o do banco) */
 function abrirImportada(l){var c=cartao(l.meio)||{},n=+l.parc||1,k0=+l.parcIni||1;
  var h='<h3>'+esc(l.desc||'Compra')+'</h3><div class="sub">'+esc(c.nome||'')+' · compra de '+dlab(l.data)+'</div><div class="card" style="margin-top:10px">'+(n>1?'<div class="kv"><span>Parcela</span><b>'+c2s(l.vParc)+'</b></div><div class="kv"><span>Parcelas</span><b>'+k0+' a '+n+' de '+n+'</b></div><div class="kv"><span>Primeira aqui</span><b>fatura de '+mesNome(l.fat)+'</b></div><div class="kv"><span>Ainda a pagar</span><b>'+c2s(l.vParc*(n-k0+1))+'</b></div>':'<div class="kv"><span>Valor</span><b>'+c2s(l.vParc)+'</b></div><div class="kv"><span>Fatura</span><b>'+mesNome(l.fat)+'</b></div>')+'<div class="sub" style="margin-top:4px">Veio da fatura do banco.</div></div>';
@@ -2024,7 +2037,7 @@ function vCartoes(){if(CT==='limites'&&viv(S.cartoes).length)return vLimites();v
  var pagT=0,resT=0;cs.forEach(function(c){var x=fatura(c.id,M),L=limiteCartao(c);tot+=x.valor;pagT+=Math.min(x.pago,x.valor);resT+=x.resta;
   h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':(c.debAuto?'débito automático ':'vence ')+dcurto(x.vence))+'</span></div><div class="amt">'+(x.pago>0&&x.resta>0?c2s(x.resta)+'<small>falta</small>':c2s(x.valor))+'</div>'+
    '<div class="l1"><span>'+(function(){var pv=paiVisivel(c.id,M,x),b=[];if(x.pago>0&&x.resta>0)b.push('pago '+c2s(x.pago)+' de '+c2s(x.valor));
-    if(pv>0)b.push(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv));else if(!x.informado&&!b.length)b.push('estimada');return b.join(' · ')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
+    if(pv>0)b.push(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv));else if(!x.informado&&!b.length)b.push('estimada');var sb=subsFatura(x);if(sb.t)Object.keys(sb.m).forEach(function(k){b.push('inclui '+k+' '+c2s(sb.m[k]))});return b.join(' · ')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
  var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
  var fut=[1,2,3].map(function(i){var ym=addM(M,i);return [ym,soma(cs,function(c){return fatura(c.id,ym).soma})]}).filter(function(f){return f[1]>0});
  h+=secN('Total de '+capM(M)+' <em>'+c2s(tot)+'</em>',(pagT>0?'<div class="kv2"><span>Já pago</span><b class="pos">'+c2s(pagT)+'</b></div><div class="kv2"><span>Falta pagar</span><b>'+c2s(resT)+'</b></div>':'')+(fut.length?fut.map(function(f){return '<div class="kv2"><span>'+capM(f[0])+' (já comprometido)</span><b>'+c2s(f[1])+'</b></div>'}).join(''):'<div class="kv2"><span>Nada comprometido nos próximos meses</span></div>'));
