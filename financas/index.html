@@ -232,7 +232,7 @@ label .auto{font-weight:600;color:var(--acc);text-transform:none;margin-left:6px
    Os dados ficam SÓ neste aparelho (localStorage + IndexedDB). O código não
    contém nenhum dado pessoal: tudo entra pelo app ou pelo arquivo de backup.
    ===================================================================== */
-var VER_NOVA=0,APP_VER=81, APP_DATE='19/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
+var VER_NOVA=0,APP_VER=82, APP_DATE='22/11/2026', KEY='finH_estado_v1', KEY_ATUAL='finH_estado_v1', PREVIA=0;
 /* ===== Hudson 14/11/2026: o app refeito virou o principal ("não tem nem comparação").
    Uma vez só: se você mexeu na prévia depois de copiar e NÃO mexeu aqui depois disso, o que fez na prévia vem junto
    (o que estava aqui fica guardado em finH_estado_v1_antes_novo). Se mexeu nos dois, vale o daqui e a prévia fica guardada. ===== */
@@ -2004,8 +2004,8 @@ function receberHoje(){var t=hoje(),lim=addD(t,7),out=[],porCarro={};
  var cp=contaPai(ymOf(t));if(cp.resta>0&&cp.vence<=addD(t,14))out.push({d:cp.vence,v:cp.resta,pai:cp});
  out.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0});
  out.forEach(function(o){
-  if(o.pai){o.html='<div class="rn tap" onclick="abrirContaPai(\''+o.pai.P+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Seu pai devolve</div><div class="s">'+(o.d===t?'hoje':dcurto(o.d))+' · cartões</div></div><div class="v pos">'+c2s(o.v)+'</div></div>';return}
-  if(o.av){var a=o.av;o.html='<div class="rn tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+(a.data<t?'<span class="neg">cobrar · '+dcurto(a.data)+'</span>':dcurto(a.data))+(a.incerto?' · incerto':'')+'</div></div><div class="v pos">'+c2s(o.v)+'</div></div>';return}
+  if(o.pai){o.html='<div class="rn tap" onclick="abrirContaPai(\''+o.pai.P+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Seu pai devolve</div><div class="s">'+subPrazo(o.d,1)+' · cartões</div></div><div class="v pos">'+c2s(o.v)+'</div></div>';return}
+  if(o.av){var a=o.av;o.html='<div class="rn tap" onclick="abrirUni(\'avulsa\',\''+a.id+'\')"><button class="ck in" aria-label="Recebi tudo hoje" onclick="event.stopPropagation();pagarRapido(\'avulsa\',\''+a.id+'\',\'\')"></button><div class="g"><div class="t">'+esc(a.desc)+'</div><div class="s">'+(a.data<t?'<span class="neg">cobrar · '+dcurto(a.data)+' · '+faltaTxt(a.data,1)+'</span>':subPrazo(a.data,1))+(a.incerto?' · incerto':'')+'</div></div><div class="v pos">'+c2s(o.v)+'</div></div>';return}
   var x=o.x,mot=x.motorista?primeiroNome(x.motorista):'',tit=x.titulo.split(' ')[0]+(mot?' · '+mot:'');if(x.kind==='renda')tit=x.titulo;
   o.html=rowN(x,{tit:tit,v:o.v,sub:o.n>1?'<span class="neg">'+o.n+' semanas atrasadas · desde '+dcurto(x.data)+'</span>':undefined})});
  return out}
@@ -2038,7 +2038,7 @@ function vCartoes(){if(CT==='limites'&&viv(S.cartoes).length)return vLimites();v
   h+='<div class="cc2" style="background:'+corCartao(c)+'" onclick="abrirFatura(\''+c.id+'\',\''+M+'\')"><div class="l1"><span>'+esc(c.nome)+'</span><span>'+(x.resta<=0&&x.valor>0?'paga ✓':(c.debAuto?'débito automático ':'vence ')+dcurto(x.vence))+'</span></div><div class="amt">'+(x.pago>0&&x.resta>0?c2s(x.resta)+'<small>falta</small>':c2s(x.valor))+'</div>'+
    '<div class="l1"><span>'+(function(){var pv=paiVisivel(c.id,M,x),b=[];if(x.pago>0&&x.resta>0)b.push('pago '+c2s(x.pago)+' de '+c2s(x.valor));
     if(pv>0)b.push(pv>x.valor?'seu pai devolve '+c2s(pv):'sua parte '+c2s(x.valor-pv));else if(!x.informado&&!b.length)b.push('estimada');var sb=subsFatura(x);if(sb.t)Object.keys(sb.m).forEach(function(k){b.push('inclui '+k+' '+c2s(sb.m[k]))});return b.join(' · ')})()+'</span><span>'+(L?'livre '+c2s(L.disp):'')+'</span></div></div>'});
- var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
+ var cp=contaPai(M);if(cp.total>0)h+=secN('Conta do seu pai',' <div class="rn tap" onclick="abrirContaPai(\''+M+'\')"><div class="bub in">↩️</div><div class="g"><div class="t">Ele devolve '+dcurto(cp.vence)+(cp.resta>0&&cp.vence>=hoje()?' · '+faltaTxt(cp.vence,1):'')+'</div><div class="s">'+(cp.resta<=0?'devolvido ✓':cp.rec>0?'falta '+c2s(cp.resta):'todos os cartões')+'</div></div><div class="v pos">'+c2s(cp.total)+'</div></div>');
  var fut=[1,2,3].map(function(i){var ym=addM(M,i);return [ym,soma(cs,function(c){return fatura(c.id,ym).soma})]}).filter(function(f){return f[1]>0});
  h+=secN('Total de '+capM(M)+' <em>'+c2s(tot)+'</em>',(pagT>0?'<div class="kv2"><span>Já pago</span><b class="pos">'+c2s(pagT)+'</b></div><div class="kv2"><span>Falta pagar</span><b>'+c2s(resT)+'</b></div>':'')+(fut.length?fut.map(function(f){return '<div class="kv2"><span>'+capM(f[0])+' (já comprometido)</span><b>'+c2s(f[1])+'</b></div>'}).join(''):'<div class="kv2"><span>Nada comprometido nos próximos meses</span></div>'));
  h+=catsFatCard(cs.map(function(c){return c.id}),M,'','|'+M);
@@ -2118,6 +2118,8 @@ function precisaClass(l){return l&&!l.del&&l.tipo==='gasto'&&l.de!=='pai'&&(l.cr
 /* quanto falta: hoje · amanhã · faltam 15 dias · venceu há 3 dias */
 function faltaTxt(d,receber){var n=diffD(hoje(),d);if(n===0)return 'hoje';if(n===1)return 'amanhã';if(n>1)return 'faltam '+n+' dias';if(n===-1)return receber?'atrasado desde ontem':'venceu ontem';return (receber?'atrasado há ':'venceu há ')+(-n)+' dias'}
 function diaLongo(d){var t=hoje(),w=pd(d).getDay(),n=DS[w];n=n.charAt(0).toUpperCase()+n.slice(1)+(w>=1&&w<=5?'-feira':'');return (d===t?'Hoje · ':d===addD(t,-1)?'Ontem · ':'')+n+', '+(+d.slice(8,10))+' de '+MESES[+d.slice(5,7)-1]}
+/* v82 (Hudson 22/11): todo item com data mostra quantos dias faltam (ou hoje / atrasado), igual em todas as listas */
+function subPrazo(d,rec){var t=hoje();if(d<t)return '<span class="neg">'+dcurto(d)+' · '+faltaTxt(d,rec)+'</span>';return dcurto(d)+' · <b class="ft'+(diffD(t,d)<=3?' perto':'')+'">'+faltaTxt(d,rec)+'</b>'}
 var _rowN0=rowN;
 rowN=function(x,o){o=o||{};if(o.sub===undefined){var d=o.data||x.dataOrig||x.data,atr=o.atr!=null?o.atr:(d<hoje()&&x.resta>0),rec=x.sinal>0;
   o.sub=atr?'<span class="neg">'+dcurto(d)+' · '+faltaTxt(d,rec)+'</span>':dcurto(d)+' · <b class="ft'+(diffD(hoje(),d)<=3?' perto':'')+'">'+faltaTxt(d,rec)+'</b>'}
